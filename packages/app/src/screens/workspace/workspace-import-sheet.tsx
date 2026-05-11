@@ -11,6 +11,7 @@ import { useMutation, useQueries, useQueryClient } from "@tanstack/react-query";
 import type { DaemonClient, FetchRecentProviderSessionEntry } from "@server/client/daemon-client";
 import type { AgentProvider } from "@server/server/agent/agent-sdk-types";
 import { IMPORTABLE_PROVIDERS } from "@server/shared/importable-providers";
+import { RefreshCw } from "lucide-react-native";
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
 import { AdaptiveModalSheet } from "@/components/adaptive-modal-sheet";
 import { LoadingSpinner } from "@/components/ui/loading-spinner";
@@ -319,6 +320,7 @@ export function WorkspaceImportSheet({
   onImportedAgent,
 }: WorkspaceImportSheetProps) {
   const queryClient = useQueryClient();
+  const { theme } = useUnistyles();
 
   const { entries: snapshotEntries, supportsSnapshot } = useProvidersSnapshot(serverId, {
     enabled: visible,
@@ -425,6 +427,10 @@ export function WorkspaceImportSheet({
     [importMutation],
   );
 
+  const handleRefresh = useCallback(() => {
+    queryClient.invalidateQueries({ queryKey: sessionsQueryRoot });
+  }, [queryClient, sessionsQueryRoot]);
+
   const erroredProviderLabels = useMemo(
     () => collectErroredProviderLabels(providersToFetch, queries, providerLabelById),
     [queries, providersToFetch, providerLabelById],
@@ -434,20 +440,50 @@ export function WorkspaceImportSheet({
   const isWaitingForSnapshot = supportsSnapshot && snapshotEntries === undefined;
   const hasNoImportableProviders = providersToFetch !== null && providersToFetch.length === 0;
   const isQueryingProviders = queries.length > 0;
+  const isRefreshing =
+    isQueryingProviders && queries.some((query) => query.isFetching && !query.isLoading);
   const isLoadingSessions =
     isWaitingForSnapshot ||
     (isQueryingProviders && queries.some((query) => query.isLoading || query.isPending));
   const allQueriesErrored = isQueryingProviders && queries.every((query) => query.isError);
-  const allQueriesSettled =
-    isQueryingProviders && queries.every((query) => !query.isLoading && !query.isPending);
   const showEmptyState =
     !isLoadingSessions &&
     !allQueriesErrored &&
     isQueryingProviders &&
-    allQueriesSettled &&
+    queries.every((query) => !query.isLoading && !query.isPending) &&
     aggregatedEntries.length === 0;
   const allAlreadyImported = showEmptyState && totalAlreadyImportedCount > 0;
   const showFilter = filterProviders.length > 1;
+  const totalCount = aggregatedEntries.length + totalAlreadyImportedCount;
+  const sessionCountText =
+    !isLoadingSessions && totalCount > 0
+      ? `共 ${totalCount} 个会话${totalAlreadyImportedCount > 0 ? `（已导入 ${totalAlreadyImportedCount} 个）` : ""}`
+      : null;
+
+  const subtitle = useMemo(
+    () =>
+      sessionCountText ? <Text style={styles.subtitleText}>{sessionCountText}</Text> : undefined,
+    [sessionCountText],
+  );
+
+  const headerActions = useMemo(() => {
+    if (!isQueryingProviders) return undefined;
+    return (
+      <Pressable
+        onPress={handleRefresh}
+        disabled={isRefreshing || importMutation.isPending}
+        accessibilityRole="button"
+        accessibilityLabel="Refresh sessions"
+        testID="workspace-import-refresh"
+      >
+        {isRefreshing ? (
+          <LoadingSpinner color={theme.colors.foregroundMuted} />
+        ) : (
+          <RefreshCw size={theme.iconSize.md} color={theme.colors.foregroundMuted} />
+        )}
+      </Pressable>
+    );
+  }, [isQueryingProviders, handleRefresh, isRefreshing, importMutation.isPending, theme]);
 
   return (
     <AdaptiveModalSheet
@@ -457,6 +493,8 @@ export function WorkspaceImportSheet({
       testID="workspace-import-sheet"
       desktopMaxWidth={560}
       snapPoints={IMPORT_SHEET_SNAP_POINTS}
+      subtitle={subtitle}
+      headerActions={headerActions}
     >
       {showFilter ? (
         <ScrollView
@@ -585,5 +623,9 @@ const styles = StyleSheet.create((theme) => ({
   statusText: {
     color: theme.colors.foregroundMuted,
     fontSize: theme.fontSize.sm,
+  },
+  subtitleText: {
+    color: theme.colors.foregroundMuted,
+    fontSize: theme.fontSize.xs,
   },
 }));

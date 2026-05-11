@@ -1224,7 +1224,7 @@ test("findPersistedAgent returns matching descriptors by session id or native ha
   await expect(manager.findPersistedAgent("codex", "session-direct")).resolves.toBe(descriptors[0]);
   await expect(manager.findPersistedAgent("codex", "native-match")).resolves.toBe(descriptors[1]);
   await expect(manager.findPersistedAgent("codex", "missing")).resolves.toBeNull();
-  expect(client.lastLimit).toBe(200);
+  expect(client.lastLimit).toBeUndefined();
 });
 
 test("reloadAgentSession passes daemon launch env through the provider launch context", async () => {

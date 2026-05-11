@@ -503,7 +503,9 @@ function isClaudeTranscriptNoiseText(value: unknown): boolean {
       value.startsWith("<ide_selection>") ||
       value.startsWith("<ide_") ||
       value.startsWith("[Request interrupted by user") ||
-      value === "Continue from where you left off."
+      value === "Continue from where you left off." ||
+      value.startsWith("<command-message>") ||
+      value.startsWith("<task-notification>")
     ) {
       return true;
     }
@@ -4461,6 +4463,7 @@ interface ClaudeSessionDescriptorAccumulator {
   sessionId: string | null;
   cwd: string | null;
   title: string | null;
+  fallbackTitle: string | null;
   timeline: AgentTimelineItem[];
 }
 
@@ -4495,6 +4498,8 @@ function applyClaudeSessionEntryToAccumulator(
         acc.title = text;
       }
       acc.timeline.push({ type: "user_message", text });
+    } else if (!acc.fallbackTitle) {
+      acc.fallbackTitle = extractClaudeCommandName(entry.message);
     }
     return;
   }
@@ -4521,6 +4526,7 @@ async function parseClaudeSessionDescriptor(
     sessionId: null,
     cwd: null,
     title: null,
+    fallbackTitle: null,
     timeline: [],
   };
 
@@ -4539,7 +4545,7 @@ async function parseClaudeSessionDescriptor(
     }
   }
 
-  const { sessionId, cwd, title, timeline } = acc;
+  const { sessionId, cwd, title, fallbackTitle, timeline } = acc;
 
   if (!sessionId || !cwd) {
     return null;
@@ -4559,7 +4565,10 @@ async function parseClaudeSessionDescriptor(
     provider: "claude",
     sessionId,
     cwd,
-    title: (title ?? "").trim() || `Claude session ${sessionId.slice(0, 8)}`,
+    title:
+      (title ?? "").trim() ||
+      (fallbackTitle ? `/${fallbackTitle}` : null) ||
+      `Claude session ${sessionId.slice(0, 8)}`,
     lastActivityAt: mtime,
     persistence,
     timeline,
@@ -4587,6 +4596,31 @@ function extractClaudeUserText(messageRaw: unknown): string | null {
         if (normalized && !isClaudeTranscriptNoiseText(normalized)) {
           return normalized;
         }
+      }
+    }
+  }
+  return null;
+}
+
+const COMMAND_NAME_PATTERN = /<command-name>\/([^<]+)<\/command-name>/;
+
+function extractClaudeCommandName(messageRaw: unknown): string | null {
+  const text = extractRawClaudeText(messageRaw);
+  if (!text || !text.startsWith("<command-message>")) return null;
+  const match = COMMAND_NAME_PATTERN.exec(text);
+  return match ? match[1] : null;
+}
+
+function extractRawClaudeText(messageRaw: unknown): string | null {
+  const message = toObjectRecord(messageRaw);
+  if (!message) return null;
+  if (typeof message.content === "string") return message.content.trim();
+  if (typeof message.text === "string") return message.text.trim();
+  if (isUnknownArray(message.content)) {
+    for (const block of message.content) {
+      const blockRecord = toObjectRecord(block);
+      if (blockRecord && typeof blockRecord.text === "string") {
+        return blockRecord.text.trim();
       }
     }
   }

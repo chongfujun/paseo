@@ -612,7 +612,6 @@ export class AgentManager {
       providerEntries.map(async ([provider, client]) => {
         try {
           return await client.listPersistedAgents!({
-            limit: options?.limit,
             cwd: options?.cwd,
           });
         } catch (error) {
@@ -626,10 +625,7 @@ export class AgentManager {
     );
     const descriptors: PersistedAgentDescriptor[] = descriptorLists.flat();
 
-    const limit = options?.limit ?? 20;
-    return descriptors
-      .sort((a, b) => b.lastActivityAt.getTime() - a.lastActivityAt.getTime())
-      .slice(0, limit);
+    return descriptors.sort((a, b) => b.lastActivityAt.getTime() - a.lastActivityAt.getTime());
   }
 
   private isProviderImportable(
@@ -660,7 +656,7 @@ export class AgentManager {
       return null;
     }
 
-    const descriptors = await client.listPersistedAgents({ limit: 200 });
+    const descriptors = await client.listPersistedAgents({});
     return (
       descriptors.find((descriptor) => {
         return (

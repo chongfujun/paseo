@@ -4566,9 +4566,7 @@ async function parseClaudeSessionDescriptor(
     sessionId,
     cwd,
     title:
-      (title ?? "").trim() ||
-      (fallbackTitle ? `/${fallbackTitle}` : null) ||
-      `Claude session ${sessionId.slice(0, 8)}`,
+      (title ?? "").trim() || (fallbackTitle ?? null) || `Claude session ${sessionId.slice(0, 8)}`,
     lastActivityAt: mtime,
     persistence,
     timeline,
@@ -4603,12 +4601,21 @@ function extractClaudeUserText(messageRaw: unknown): string | null {
 }
 
 const COMMAND_NAME_PATTERN = /<command-name>\/([^<]+)<\/command-name>/;
+const COMMAND_ARGS_PATTERN = /<command-args>([^<]+)<\/command-args>/;
 
 function extractClaudeCommandName(messageRaw: unknown): string | null {
   const text = extractRawClaudeText(messageRaw);
   if (!text || !text.startsWith("<command-message>")) return null;
-  const match = COMMAND_NAME_PATTERN.exec(text);
-  return match ? match[1] : null;
+  const nameMatch = COMMAND_NAME_PATTERN.exec(text);
+  if (!nameMatch) return null;
+  const commandName = nameMatch[1];
+  const argsMatch = COMMAND_ARGS_PATTERN.exec(text);
+  if (argsMatch) {
+    const args = argsMatch[1].trim();
+    const lastSegment = args.split(/[/\\]/).findLast((segment) => segment.length > 0) ?? "";
+    if (lastSegment) return `${commandName}: ${lastSegment}`;
+  }
+  return commandName;
 }
 
 function extractRawClaudeText(messageRaw: unknown): string | null {

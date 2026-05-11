@@ -10,7 +10,17 @@ import path from "node:path";
 import { pathToFileURL } from "node:url";
 import { existsSync } from "node:fs";
 import { execFileSync } from "node:child_process";
-import { app, BrowserWindow, Menu, ipcMain, nativeImage, net, protocol, session } from "electron";
+import {
+  app,
+  BrowserWindow,
+  Menu,
+  Tray,
+  ipcMain,
+  nativeImage,
+  net,
+  protocol,
+  session,
+} from "electron";
 import { createDaemonCommandHandlers, registerDaemonManager } from "./daemon/daemon-manager.js";
 import { parsePassthroughCliArgsFromArgv, runPassthroughCli } from "./daemon/cli/passthrough.js";
 import { closeAllTransportSessions } from "./daemon/local-transport.js";
@@ -109,6 +119,8 @@ const FORWARDED_PASEO_SHORTCUT_KEYS = new Set([
 const DESKTOP_SMOKE_ENV = "PASEO_DESKTOP_SMOKE";
 const DESKTOP_SMOKE_STOP_REQUEST = "paseo-smoke-stop";
 app.setName("Paseo");
+
+let appTray: Tray | null = null;
 
 function getBrowserIdFromWebviewPartition(partition: string | undefined): string | null {
   const prefix = "persist:paseo-browser-";
@@ -492,6 +504,14 @@ async function createMainWindow(): Promise<void> {
     mainWindow.show();
   });
 
+  mainWindow.on("close", (event) => {
+    if (process.platform === "darwin") return;
+    if (!app.isPackaged) return;
+    if (appTray === null) return;
+    event.preventDefault();
+    mainWindow.hide();
+  });
+
   if (!app.isPackaged) {
     const { loadReactDevTools } = await import("./features/react-devtools.js");
     await loadReactDevTools();
@@ -500,6 +520,50 @@ async function createMainWindow(): Promise<void> {
   }
 
   await mainWindow.loadURL(`${APP_SCHEME}://app/`);
+}
+
+function setupSystemTray(): void {
+  if (process.platform === "darwin") return;
+
+  const iconPath = getWindowIconPath();
+  if (!iconPath) return;
+
+  const icon = nativeImage.createFromPath(iconPath).resize({ width: 16, height: 16 });
+  const tray = new Tray(icon);
+  tray.setToolTip("Paseo");
+  tray.setContextMenu(
+    Menu.buildFromTemplate([
+      {
+        label: "Show",
+        click: () => {
+          const win = BrowserWindow.getAllWindows()[0];
+          if (win) {
+            win.show();
+            if (win.isMinimized()) win.restore();
+            win.focus();
+          }
+        },
+      },
+      { type: "separator" },
+      {
+        label: "Quit",
+        click: () => {
+          appTray = null;
+          tray.destroy();
+          app.quit();
+        },
+      },
+    ]),
+  );
+  tray.on("double-click", () => {
+    const win = BrowserWindow.getAllWindows()[0];
+    if (win) {
+      win.show();
+      if (win.isMinimized()) win.restore();
+      win.focus();
+    }
+  });
+  appTray = tray;
 }
 
 function sendOpenProjectEvent(win: BrowserWindow, projectPath: string): void {
@@ -661,6 +725,7 @@ async function bootstrap(): Promise<void> {
   registerOpenerHandlers();
 
   await createMainWindow();
+  setupSystemTray();
 
   app.on("activate", async () => {
     if (BrowserWindow.getAllWindows().length === 0) {

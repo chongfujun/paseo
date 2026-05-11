@@ -20,7 +20,7 @@ import { formatTimeAgo } from "@/utils/time";
 import { useProvidersSnapshot } from "@/hooks/use-providers-snapshot";
 
 const IMPORTABLE_PROVIDER_IDS: Set<string> = new Set(IMPORTABLE_PROVIDERS);
-const PER_PROVIDER_LIMIT = 50;
+
 const IMPORT_SHEET_SNAP_POINTS = ["70%", "92%"];
 const DISABLED_ACCESSIBILITY_STATE = { disabled: true };
 const ALL_FILTER_VALUE = "__all__";
@@ -104,7 +104,6 @@ function buildSessionsQueriesConfig(args: {
       return await client.fetchRecentProviderSessions({
         cwd: workspaceDirectory,
         providers: [provider],
-        limit: PER_PROVIDER_LIMIT,
       });
     },
   }));

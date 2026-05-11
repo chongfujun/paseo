@@ -384,7 +384,6 @@ describe("WorkspaceImportSheet", () => {
       expect(fetchRecentProviderSessions).toHaveBeenCalledWith({
         cwd: "/repo/paseo",
         providers: ["claude"],
-        limit: 50,
       });
     });
 
@@ -446,7 +445,6 @@ describe("WorkspaceImportSheet", () => {
       expect(fetchRecentProviderSessions).toHaveBeenCalledWith({
         cwd: "/repo/paseo",
         providers: ["claude"],
-        limit: 50,
       });
     });
   });
@@ -559,13 +557,11 @@ describe("WorkspaceImportSheet", () => {
       expect(fetchRecentProviderSessions).toHaveBeenCalledWith({
         cwd: "/repo/paseo",
         providers: ["claude"],
-        limit: 50,
       });
     });
     expect(fetchRecentProviderSessions).toHaveBeenCalledWith({
       cwd: "/repo/paseo",
       providers: ["codex"],
-      limit: 50,
     });
     expect(fetchRecentProviderSessions).not.toHaveBeenCalledWith(
       expect.objectContaining({ providers: ["opencode"] }),

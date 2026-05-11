@@ -1244,14 +1244,13 @@ export class ClaudeAgentClient implements AgentClient {
     if (!(await pathExists(projectsRoot))) {
       return [];
     }
-    const limit = options?.limit ?? 20;
-    const candidates = await collectRecentClaudeSessions(projectsRoot, limit * 3, options?.cwd);
+    const candidates = await collectRecentClaudeSessions(projectsRoot, options?.cwd);
     const parsed = await Promise.all(
       candidates.map((candidate) => parseClaudeSessionDescriptor(candidate.path, candidate.mtime)),
     );
-    return parsed
-      .filter((descriptor): descriptor is PersistedAgentDescriptor => descriptor !== null)
-      .slice(0, limit);
+    return parsed.filter(
+      (descriptor): descriptor is PersistedAgentDescriptor => descriptor !== null,
+    );
   }
 
   async isAvailable(): Promise<boolean> {
@@ -4410,7 +4409,6 @@ async function pathExists(target: string): Promise<boolean> {
 
 async function collectRecentClaudeSessions(
   root: string,
-  limit: number,
   cwd?: string,
 ): Promise<ClaudeSessionCandidate[]> {
   let projectDirs: string[];
@@ -4456,7 +4454,7 @@ async function collectRecentClaudeSessions(
   const candidates: ClaudeSessionCandidate[] = statResults.filter(
     (entry): entry is ClaudeSessionCandidate => entry !== null,
   );
-  return candidates.sort((a, b) => b.mtime.getTime() - a.mtime.getTime()).slice(0, limit);
+  return candidates.sort((a, b) => b.mtime.getTime() - a.mtime.getTime());
 }
 
 interface ClaudeSessionDescriptorAccumulator {

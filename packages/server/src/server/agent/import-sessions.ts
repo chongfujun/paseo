@@ -100,13 +100,11 @@ export async function listImportableProviderSessions(
 ): Promise<ListImportableProviderSessionsResult> {
   const { request, agentManager, agentStorage, providerRegistry } = input;
   const normalizePath = (p: string) => p.replace(/\\/g, "/").toLowerCase();
-  const limit = request.limit ?? 20;
   const sinceTimestamp = parseRecentProviderSessionsSince(request.since);
   const providerFilter = request.providers ? new Set(request.providers) : undefined;
   const importedHandles = await collectImportedProviderSessionHandles(agentManager, agentStorage);
 
   const descriptors = await agentManager.listImportablePersistedAgents({
-    limit: 200,
     providerFilter,
     cwd: request.cwd,
   });
@@ -133,7 +131,6 @@ export async function listImportableProviderSessions(
 
   const entries = candidates
     .sort((a, b) => b.lastActivityAt.getTime() - a.lastActivityAt.getTime())
-    .slice(0, limit)
     .map((descriptor) =>
       toRecentProviderSessionDescriptorPayload(descriptor, {
         providerLabel: providerRegistry[descriptor.provider]?.label ?? descriptor.provider,

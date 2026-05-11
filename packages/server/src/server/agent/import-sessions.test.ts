@@ -107,7 +107,7 @@ function makeRequest(
   };
 }
 
-test("listImportableProviderSessions filters, sorts, limits, and projects importable sessions", async () => {
+test("listImportableProviderSessions filters, sorts, and projects importable sessions", async () => {
   const cwd = "/tmp/project";
   const descriptors = [
     makeDescriptor({
@@ -197,7 +197,6 @@ test("listImportableProviderSessions filters, sorts, limits, and projects import
       cwd,
       providers: ["codex"],
       since: "2026-04-30T00:00:00.000Z",
-      limit: 2,
     }),
     agentManager,
     agentStorage,
@@ -205,7 +204,6 @@ test("listImportableProviderSessions filters, sorts, limits, and projects import
   });
 
   expect(listImportablePersistedAgents).toHaveBeenCalledWith({
-    limit: 200,
     providerFilter: new Set(["codex"]),
     cwd,
   });
@@ -231,6 +229,16 @@ test("listImportableProviderSessions filters, sorts, limits, and projects import
         firstPromptPreview: "second prompt",
         lastPromptPreview: "second prompt",
         lastActivityAt: "2026-04-30T12:00:00.000Z",
+      },
+      {
+        providerId: "codex",
+        providerLabel: "Codex",
+        providerHandleId: "third-handle",
+        cwd,
+        title: "Third import",
+        firstPromptPreview: "third prompt",
+        lastPromptPreview: "third prompt",
+        lastActivityAt: "2026-04-30T11:59:00.000Z",
       },
     ],
   });

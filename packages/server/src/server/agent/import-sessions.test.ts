@@ -461,3 +461,80 @@ test("importProviderSession requires cwd for missing OpenCode descriptors", asyn
     "OpenCode sessions require --cwd when the session cannot be found in persisted agents",
   );
 });
+
+test("listImportableProviderSessions normalizes Windows path separators for cwd matching", async () => {
+  const descriptors = [
+    makeDescriptor({
+      sessionId: "backslash-session",
+      nativeHandle: "backslash-handle",
+      cwd: "D:\\cvedetails\\google-osv-api",
+      title: "Backslash path",
+      lastActivityAt: "2026-04-30T12:00:00.000Z",
+    }),
+    makeDescriptor({
+      sessionId: "forward-slash-session",
+      nativeHandle: "forward-handle",
+      cwd: "D:/cvedetails/google-osv-api",
+      title: "Forward slash path",
+      lastActivityAt: "2026-04-30T11:00:00.000Z",
+    }),
+    makeDescriptor({
+      sessionId: "other-project",
+      nativeHandle: "other-handle",
+      cwd: "D:\\other\\project",
+      title: "Other project",
+      lastActivityAt: "2026-04-30T13:00:00.000Z",
+    }),
+  ];
+
+  const result = await listImportableProviderSessions({
+    request: makeRequest({
+      cwd: "D:/cvedetails/google-osv-api",
+      providers: ["codex"],
+    }),
+    agentManager: {
+      listAgents: () => [],
+      listImportablePersistedAgents: async () => descriptors,
+    } satisfies Pick<AgentManager, "listAgents" | "listImportablePersistedAgents">,
+    agentStorage: {
+      list: async () => [],
+    } satisfies Pick<AgentStorage, "list">,
+    providerRegistry: { codex: { label: "Codex" } },
+  });
+
+  expect(result.entries).toHaveLength(2);
+  expect(result.entries.map((e) => e.providerHandleId).sort()).toEqual([
+    "backslash-handle",
+    "forward-handle",
+  ]);
+});
+
+test("listImportableProviderSessions normalizes cwd case for matching", async () => {
+  const descriptors = [
+    makeDescriptor({
+      sessionId: "lowercase-session",
+      nativeHandle: "lowercase-handle",
+      cwd: "d:\\cvedetails\\google-osv-api",
+      title: "Lowercase drive",
+      lastActivityAt: "2026-04-30T12:00:00.000Z",
+    }),
+  ];
+
+  const result = await listImportableProviderSessions({
+    request: makeRequest({
+      cwd: "D:/cvedetails/GOOGLE-OSV-API",
+      providers: ["codex"],
+    }),
+    agentManager: {
+      listAgents: () => [],
+      listImportablePersistedAgents: async () => descriptors,
+    } satisfies Pick<AgentManager, "listAgents" | "listImportablePersistedAgents">,
+    agentStorage: {
+      list: async () => [],
+    } satisfies Pick<AgentStorage, "list">,
+    providerRegistry: { codex: { label: "Codex" } },
+  });
+
+  expect(result.entries).toHaveLength(1);
+  expect(result.entries[0].providerHandleId).toBe("lowercase-handle");
+});

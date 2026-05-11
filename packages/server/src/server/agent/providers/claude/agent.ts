@@ -493,6 +493,21 @@ function isClaudeLocalCommandStdout(value: unknown): boolean {
 }
 
 function isClaudeTranscriptNoiseText(value: unknown): boolean {
+  if (typeof value === "string") {
+    if (
+      value.startsWith("Base directory for this skill:") ||
+      value.startsWith("<EXTREMELY_IMPORTANT>") ||
+      value.startsWith("EXTREMELY_IMPORTANT") ||
+      value.includes("<SUBAGENT-STOP>") ||
+      value.startsWith("<ide_opened_file>") ||
+      value.startsWith("<ide_selection>") ||
+      value.startsWith("<ide_") ||
+      value.startsWith("[Request interrupted by user") ||
+      value === "Continue from where you left off."
+    ) {
+      return true;
+    }
+  }
   return (
     isClaudeInterruptPlaceholderText(value) ||
     isClaudeNoResponsePlaceholderText(value) ||
@@ -1230,7 +1245,7 @@ export class ClaudeAgentClient implements AgentClient {
       return [];
     }
     const limit = options?.limit ?? 20;
-    const candidates = await collectRecentClaudeSessions(projectsRoot, limit * 3);
+    const candidates = await collectRecentClaudeSessions(projectsRoot, limit * 3, options?.cwd);
     const parsed = await Promise.all(
       candidates.map((candidate) => parseClaudeSessionDescriptor(candidate.path, candidate.mtime)),
     );
@@ -4396,12 +4411,21 @@ async function pathExists(target: string): Promise<boolean> {
 async function collectRecentClaudeSessions(
   root: string,
   limit: number,
+  cwd?: string,
 ): Promise<ClaudeSessionCandidate[]> {
   let projectDirs: string[];
   try {
     projectDirs = await fsPromises.readdir(root);
   } catch {
     return [];
+  }
+  const normalizeForMatch = (p: string) => p.replace(/\\/g, "/").toLowerCase();
+  const normalizedCwd = cwd ? normalizeForMatch(cwd) : undefined;
+  if (normalizedCwd) {
+    const encoded = normalizedCwd.replace(/:/g, "-").replace(/\//g, "-");
+    projectDirs = projectDirs.filter(
+      (dirName) => dirName === encoded || dirName.startsWith(encoded + "-"),
+    );
   }
   const projectFileLists = await Promise.all(
     projectDirs.map(async (dirName) => {

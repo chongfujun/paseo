@@ -384,7 +384,7 @@ describe("WorkspaceImportSheet", () => {
       expect(fetchRecentProviderSessions).toHaveBeenCalledWith({
         cwd: "/repo/paseo",
         providers: ["claude"],
-        limit: 15,
+        limit: 50,
       });
     });
 
@@ -446,7 +446,7 @@ describe("WorkspaceImportSheet", () => {
       expect(fetchRecentProviderSessions).toHaveBeenCalledWith({
         cwd: "/repo/paseo",
         providers: ["claude"],
-        limit: 15,
+        limit: 50,
       });
     });
   });
@@ -559,13 +559,13 @@ describe("WorkspaceImportSheet", () => {
       expect(fetchRecentProviderSessions).toHaveBeenCalledWith({
         cwd: "/repo/paseo",
         providers: ["claude"],
-        limit: 15,
+        limit: 50,
       });
     });
     expect(fetchRecentProviderSessions).toHaveBeenCalledWith({
       cwd: "/repo/paseo",
       providers: ["codex"],
-      limit: 15,
+      limit: 50,
     });
     expect(fetchRecentProviderSessions).not.toHaveBeenCalledWith(
       expect.objectContaining({ providers: ["opencode"] }),
@@ -719,5 +719,98 @@ describe("WorkspaceImportSheet", () => {
 
     await screen.findByText("No importable providers are enabled.");
     expect(fetchRecentProviderSessions).not.toHaveBeenCalled();
+  });
+
+  it("renders a search input that filters sessions by title", async () => {
+    const fetchRecentProviderSessions = vi.fn(async () => ({
+      requestId: "recent-provider-sessions",
+      entries: [
+        createProviderSessionEntry({
+          providerHandleId: "handle-1",
+          title: "Fix login bug",
+          firstPromptPreview: "Fix the login page bug",
+          lastPromptPreview: "Fix the login page bug",
+        }),
+        createProviderSessionEntry({
+          providerHandleId: "handle-2",
+          title: "Add dark mode",
+          firstPromptPreview: "Implement dark mode toggle",
+          lastPromptPreview: "Implement dark mode toggle",
+        }),
+        createProviderSessionEntry({
+          providerHandleId: "handle-3",
+          title: "Refactor API layer",
+          firstPromptPreview: "Refactor the API layer",
+          lastPromptPreview: "Refactor the API layer",
+        }),
+      ],
+    }));
+    const importAgent = vi.fn();
+
+    renderSheet(
+      { fetchRecentProviderSessions, importAgent } as Pick<
+        DaemonClient,
+        "fetchRecentProviderSessions" | "importAgent"
+      >,
+      {
+        snapshot: {
+          supportsSnapshot: true,
+          entries: [createSnapshotEntry("claude")],
+        },
+      },
+    );
+
+    await screen.findByText("Fix login bug");
+    expect(screen.getByText("Add dark mode")).toBeTruthy();
+    expect(screen.getByText("Refactor API layer")).toBeTruthy();
+
+    const searchInput = screen.getByPlaceholderText("Search sessions...");
+    fireEvent.change(searchInput, { target: { value: "dark mode" } });
+
+    expect(screen.getByText("Add dark mode")).toBeTruthy();
+    expect(screen.queryByText("Fix login bug")).toBeNull();
+    expect(screen.queryByText("Refactor API layer")).toBeNull();
+  });
+
+  it("filters sessions by prompt preview when search query does not match title", async () => {
+    const fetchRecentProviderSessions = vi.fn(async () => ({
+      requestId: "recent-provider-sessions",
+      entries: [
+        createProviderSessionEntry({
+          providerHandleId: "handle-1",
+          title: "Session A",
+          firstPromptPreview: "Analyze vulnerability in DB-GPT",
+          lastPromptPreview: "Analyze vulnerability in DB-GPT",
+        }),
+        createProviderSessionEntry({
+          providerHandleId: "handle-2",
+          title: "Session B",
+          firstPromptPreview: "Build REST API endpoint",
+          lastPromptPreview: "Build REST API endpoint",
+        }),
+      ],
+    }));
+    const importAgent = vi.fn();
+
+    renderSheet(
+      { fetchRecentProviderSessions, importAgent } as Pick<
+        DaemonClient,
+        "fetchRecentProviderSessions" | "importAgent"
+      >,
+      {
+        snapshot: {
+          supportsSnapshot: true,
+          entries: [createSnapshotEntry("claude")],
+        },
+      },
+    );
+
+    await screen.findByText("Session A");
+
+    const searchInput = screen.getByPlaceholderText("Search sessions...");
+    fireEvent.change(searchInput, { target: { value: "vulnerability" } });
+
+    expect(screen.getByText("Session A")).toBeTruthy();
+    expect(screen.queryByText("Session B")).toBeNull();
   });
 });

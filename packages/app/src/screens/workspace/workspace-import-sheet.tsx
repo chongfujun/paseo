@@ -1,5 +1,12 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
-import { Pressable, type PressableStateCallbackType, ScrollView, Text, View } from "react-native";
+import {
+  Pressable,
+  type PressableStateCallbackType,
+  ScrollView,
+  TextInput,
+  Text,
+  View,
+} from "react-native";
 import { useMutation, useQueries, useQueryClient } from "@tanstack/react-query";
 import type { DaemonClient, FetchRecentProviderSessionEntry } from "@server/client/daemon-client";
 import type { AgentProvider } from "@server/server/agent/agent-sdk-types";
@@ -13,7 +20,7 @@ import { formatTimeAgo } from "@/utils/time";
 import { useProvidersSnapshot } from "@/hooks/use-providers-snapshot";
 
 const IMPORTABLE_PROVIDER_IDS: Set<string> = new Set(IMPORTABLE_PROVIDERS);
-const PER_PROVIDER_LIMIT = 15;
+const PER_PROVIDER_LIMIT = 50;
 const IMPORT_SHEET_SNAP_POINTS = ["70%", "92%"];
 const DISABLED_ACCESSIBILITY_STATE = { disabled: true };
 const ALL_FILTER_VALUE = "__all__";
@@ -356,6 +363,7 @@ export function WorkspaceImportSheet({
   const filterProviders = useMemo(() => [...(providersToFetch ?? [])].sort(), [providersToFetch]);
 
   const [selectedProvider, setSelectedProvider] = useState<string>(ALL_FILTER_VALUE);
+  const [searchQuery, setSearchQuery] = useState("");
 
   useEffect(() => {
     if (
@@ -363,13 +371,24 @@ export function WorkspaceImportSheet({
       (selectedProvider !== ALL_FILTER_VALUE && !filterProviders.includes(selectedProvider))
     ) {
       setSelectedProvider(ALL_FILTER_VALUE);
+      setSearchQuery("");
     }
   }, [visible, filterProviders, selectedProvider]);
 
-  const visibleEntries = useMemo(() => {
+  const providerFilteredEntries = useMemo(() => {
     if (selectedProvider === ALL_FILTER_VALUE) return aggregatedEntries;
     return aggregatedEntries.filter((entry) => entry.providerId === selectedProvider);
   }, [aggregatedEntries, selectedProvider]);
+
+  const visibleEntries = useMemo(() => {
+    const q = searchQuery.trim().toLowerCase();
+    if (!q) return providerFilteredEntries;
+    return providerFilteredEntries.filter((entry) => {
+      const title = getSessionTitle(entry).toLowerCase();
+      const preview = getPromptPreview(entry).toLowerCase();
+      return title.includes(q) || preview.includes(q);
+    });
+  }, [providerFilteredEntries, searchQuery]);
 
   const filterOptions = useMemo(
     () => buildProviderFilterOptions(filterProviders, providerLabelById),
@@ -455,6 +474,15 @@ export function WorkspaceImportSheet({
           />
         </ScrollView>
       ) : null}
+      <TextInput
+        style={styles.searchInput}
+        placeholder="Search sessions..."
+        placeholderTextColor="#999"
+        value={searchQuery}
+        onChangeText={setSearchQuery}
+        autoCorrect={false}
+        autoCapitalize="none"
+      />
       <SheetStatusMessages
         isClientReady={Boolean(client && workspaceDirectory)}
         isSnapshotUnsupported={isSnapshotUnsupported}
@@ -487,6 +515,17 @@ const styles = StyleSheet.create((theme) => ({
   filterRow: {
     flexDirection: "row",
     paddingBottom: theme.spacing[2],
+  },
+  searchInput: {
+    borderWidth: theme.borderWidth[1],
+    borderColor: theme.colors.border,
+    borderRadius: theme.borderRadius.md,
+    backgroundColor: theme.colors.surface1,
+    paddingHorizontal: theme.spacing[3],
+    paddingVertical: theme.spacing[2],
+    color: theme.colors.foreground,
+    fontSize: theme.fontSize.sm,
+    marginBottom: theme.spacing[2],
   },
   list: {
     gap: theme.spacing[1],

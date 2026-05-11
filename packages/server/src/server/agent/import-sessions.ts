@@ -99,6 +99,7 @@ export async function listImportableProviderSessions(
   input: ListImportableProviderSessionsInput,
 ): Promise<ListImportableProviderSessionsResult> {
   const { request, agentManager, agentStorage, providerRegistry } = input;
+  const normalizePath = (p: string) => p.replace(/\\/g, "/").toLowerCase();
   const limit = request.limit ?? 20;
   const sinceTimestamp = parseRecentProviderSessionsSince(request.since);
   const providerFilter = request.providers ? new Set(request.providers) : undefined;
@@ -112,7 +113,7 @@ export async function listImportableProviderSessions(
   let filteredAlreadyImportedCount = 0;
   const candidates: PersistedAgentDescriptor[] = [];
   for (const descriptor of descriptors) {
-    if (request.cwd && descriptor.cwd !== request.cwd) {
+    if (request.cwd && normalizePath(descriptor.cwd) !== normalizePath(request.cwd)) {
       continue;
     }
     if (sinceTimestamp !== null && descriptor.lastActivityAt.getTime() < sinceTimestamp) {

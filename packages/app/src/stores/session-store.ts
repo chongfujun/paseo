@@ -1,7 +1,7 @@
 import equal from "fast-deep-equal";
 import { create } from "zustand";
 import { subscribeWithSelector } from "zustand/middleware";
-import type { DaemonClient } from "@server/client/daemon-client";
+import type { DaemonClient, FetchRecentProviderSessionEntry } from "@server/client/daemon-client";
 import type { AgentDirectoryEntry } from "@/types/agent-directory";
 import type { StreamItem } from "@/types/stream";
 import type { PendingPermission } from "@/types/shared";
@@ -284,6 +284,9 @@ export interface SessionState {
   agentDetails: Map<string, Agent>;
   workspaces: Map<string, WorkspaceDescriptor>;
 
+  // Discoverable (unimported) provider sessions
+  discoverableSessions: FetchRecentProviderSessionEntry[];
+
   // Permissions
   pendingPermissions: Map<string, PendingPermission>;
 
@@ -395,6 +398,9 @@ interface SessionStoreActions {
   mergeWorkspaces: (serverId: string, workspaces: Iterable<WorkspaceDescriptor>) => void;
   removeWorkspace: (serverId: string, workspaceId: string) => void;
 
+  // Discoverable sessions
+  setDiscoverableSessions: (serverId: string, sessions: FetchRecentProviderSessionEntry[]) => void;
+
   // Agent activity timestamps
   setAgentLastActivity: (agentId: string, timestamp: Date) => void;
   setAgentLastActivityBatch: (
@@ -464,6 +470,7 @@ function createInitialSessionState(serverId: string, client: DaemonClient): Sess
     agents: new Map(),
     agentDetails: new Map(),
     workspaces: new Map(),
+    discoverableSessions: [],
     pendingPermissions: new Map(),
     fileExplorer: new Map(),
     queuedMessages: new Map(),
@@ -1130,6 +1137,20 @@ export const useSessionStore = create<SessionStore>()(
             sessions: {
               ...prev.sessions,
               [serverId]: { ...session, workspaces: next },
+            },
+          };
+        });
+      },
+
+      setDiscoverableSessions: (serverId, sessions) => {
+        set((prev) => {
+          const session = prev.sessions[serverId];
+          if (!session) return prev;
+          return {
+            ...prev,
+            sessions: {
+              ...prev.sessions,
+              [serverId]: { ...session, discoverableSessions: sessions },
             },
           };
         });

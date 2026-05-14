@@ -613,6 +613,7 @@ export class AgentManager {
         try {
           return await client.listPersistedAgents!({
             cwd: options?.cwd,
+            lightweight: options?.lightweight,
           });
         } catch (error) {
           this.logger.warn(

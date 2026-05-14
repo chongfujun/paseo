@@ -1248,7 +1248,11 @@ export class ClaudeAgentClient implements AgentClient {
     }
     const candidates = await collectRecentClaudeSessions(projectsRoot, options?.cwd);
     const parsed = await Promise.all(
-      candidates.map((candidate) => parseClaudeSessionDescriptor(candidate.path, candidate.mtime)),
+      candidates.map((candidate) =>
+        parseClaudeSessionDescriptor(candidate.path, candidate.mtime, {
+          lightweight: options?.lightweight,
+        }),
+      ),
     );
     return parsed.filter(
       (descriptor): descriptor is PersistedAgentDescriptor => descriptor !== null,
@@ -3221,8 +3225,8 @@ class ClaudeAgentSession implements AgentSession {
       );
       if (normalizedRuntimeModel) {
         this.lastOptionsModel = normalizedRuntimeModel;
-      } else if (!this.lastOptionsModel) {
-        this.lastOptionsModel = this.config.model ?? null;
+      } else {
+        this.lastOptionsModel = message.model;
       }
       this.lastRuntimeModel = message.model;
       this.cachedRuntimeInfo = null;
@@ -4465,6 +4469,7 @@ interface ClaudeSessionDescriptorAccumulator {
   title: string | null;
   fallbackTitle: string | null;
   timeline: AgentTimelineItem[];
+  lightweight: boolean;
 }
 
 function isFinishedAccumulator(acc: ClaudeSessionDescriptorAccumulator): boolean {
@@ -4497,7 +4502,9 @@ function applyClaudeSessionEntryToAccumulator(
       if (!acc.title) {
         acc.title = text;
       }
-      acc.timeline.push({ type: "user_message", text });
+      if (!acc.lightweight) {
+        acc.timeline.push({ type: "user_message", text });
+      }
     } else if (!acc.fallbackTitle) {
       acc.fallbackTitle = extractClaudeCommandName(entry.message);
     }
@@ -4505,15 +4512,16 @@ function applyClaudeSessionEntryToAccumulator(
   }
   if (entry.type === "assistant" && entry.message) {
     const text = extractClaudeUserText(entry.message);
-    if (text) {
+    if (text && !acc.lightweight) {
       acc.timeline.push({ type: "assistant_message", text });
     }
   }
 }
 
-async function parseClaudeSessionDescriptor(
+export async function parseClaudeSessionDescriptor(
   filePath: string,
   mtime: Date,
+  options?: { lightweight?: boolean },
 ): Promise<PersistedAgentDescriptor | null> {
   let content: string;
   try {
@@ -4522,12 +4530,15 @@ async function parseClaudeSessionDescriptor(
     return null;
   }
 
+  const lightweight = options?.lightweight ?? false;
+
   const acc: ClaudeSessionDescriptorAccumulator = {
     sessionId: null,
     cwd: null,
     title: null,
     fallbackTitle: null,
     timeline: [],
+    lightweight,
   };
 
   for (const rawLine of content.split(/\r?\n/)) {

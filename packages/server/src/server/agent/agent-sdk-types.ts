@@ -434,6 +434,8 @@ export interface ListPersistedAgentsOptions {
    * cheaply may ignore this hint.
    */
   cwd?: string;
+  /** When true, skip building timelines — return metadata only. */
+  lightweight?: boolean;
 }
 
 export interface PersistedAgentDescriptor {

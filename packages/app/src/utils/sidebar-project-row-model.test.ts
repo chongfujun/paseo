@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   buildSidebarProjectRowModel,
   isSidebarProjectFlattened,
+  shouldShowAgentSubItems,
 } from "./sidebar-project-row-model";
 import type {
   SidebarProjectEntry,
@@ -146,6 +147,64 @@ describe("isSidebarProjectFlattened", () => {
           ],
         }),
       ),
+    ).toBe(false);
+  });
+});
+
+describe("shouldShowAgentSubItems", () => {
+  it("shows agents for flattened projects regardless of collapse state", () => {
+    const flattenedModel = buildSidebarProjectRowModel({
+      project: project({
+        projectKind: "directory",
+        workspaces: [workspace({ workspaceId: "ws-single" })],
+      }),
+      collapsed: false,
+    });
+
+    expect(
+      shouldShowAgentSubItems({ rowModel: flattenedModel, collapsed: false, agentCount: 2 }),
+    ).toBe(true);
+  });
+
+  it("shows agents for expanded projects when not collapsed", () => {
+    const expandedModel = buildSidebarProjectRowModel({
+      project: project({
+        projectKind: "git",
+        workspaces: [workspace({ workspaceId: "ws-main" }), workspace({ workspaceId: "ws-feat" })],
+      }),
+      collapsed: false,
+    });
+
+    expect(
+      shouldShowAgentSubItems({ rowModel: expandedModel, collapsed: false, agentCount: 1 }),
+    ).toBe(true);
+  });
+
+  it("hides agents for collapsed expanded projects", () => {
+    const expandedModel = buildSidebarProjectRowModel({
+      project: project({
+        projectKind: "git",
+        workspaces: [workspace({ workspaceId: "ws-main" }), workspace({ workspaceId: "ws-feat" })],
+      }),
+      collapsed: true,
+    });
+
+    expect(
+      shouldShowAgentSubItems({ rowModel: expandedModel, collapsed: true, agentCount: 1 }),
+    ).toBe(false);
+  });
+
+  it("hides agents when none exist even for flattened projects", () => {
+    const flattenedModel = buildSidebarProjectRowModel({
+      project: project({
+        projectKind: "directory",
+        workspaces: [workspace({ workspaceId: "ws-single" })],
+      }),
+      collapsed: false,
+    });
+
+    expect(
+      shouldShowAgentSubItems({ rowModel: flattenedModel, collapsed: false, agentCount: 0 }),
     ).toBe(false);
   });
 });

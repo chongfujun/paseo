@@ -24,6 +24,16 @@ export function isSidebarProjectFlattened(project: SidebarProjectEntry): boolean
   return project.workspaces.length === 1 && project.projectKind !== "git";
 }
 
+export function shouldShowAgentSubItems(input: {
+  rowModel: SidebarProjectRowModel;
+  collapsed: boolean;
+  agentCount: number;
+}): boolean {
+  if (input.agentCount === 0) return false;
+  if (input.rowModel.kind === "workspace_link") return true;
+  return !input.collapsed;
+}
+
 export function buildSidebarProjectRowModel(input: {
   project: SidebarProjectEntry;
   collapsed: boolean;

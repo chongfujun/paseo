@@ -96,7 +96,10 @@ import type { ShortcutKey } from "@/utils/format-shortcut";
 import { useShortcutKeys } from "@/hooks/use-shortcut-keys";
 import { useKeyboardActionHandler } from "@/hooks/use-keyboard-action-handler";
 import { type PrHint, useWorkspacePrHint } from "@/git/use-pr-status-query";
-import { buildSidebarProjectRowModel } from "@/utils/sidebar-project-row-model";
+import {
+  buildSidebarProjectRowModel,
+  shouldShowAgentSubItems,
+} from "@/utils/sidebar-project-row-model";
 import { useActiveWorkspaceSelection } from "@/stores/navigation-active-workspace-store";
 import { useSessionStore, type WorkspaceDescriptor } from "@/stores/session-store";
 import { useWorkspaceFields } from "@/stores/session-store-hooks";
@@ -106,6 +109,9 @@ import {
   requireWorkspaceExecutionDirectory,
   resolveWorkspaceExecutionDirectory,
 } from "@/utils/workspace-execution";
+import { useSidebarAgents, type SidebarAgentEntry } from "@/hooks/use-sidebar-agents";
+import { getProviderIcon } from "@/components/provider-icons";
+import { navigateToAgent } from "@/utils/navigate-to-agent";
 import {
   archiveWorkspaceOptimistically,
   archiveWorkspacesOptimistically,
@@ -120,6 +126,8 @@ function toProjectIconDataUri(icon: { mimeType: string; data: string } | null): 
   }
   return `data:${icon.mimeType};base64,${icon.data}`;
 }
+
+const EMPTY_SIDEBAR_AGENTS: SidebarAgentEntry[] = [];
 
 const workspaceKeyExtractor = (workspace: SidebarWorkspaceEntry) => workspace.workspaceKey;
 
@@ -1953,6 +1961,135 @@ function WorkspaceRow({
   );
 }
 
+function SidebarAgentRow({
+  agent,
+  serverId,
+  onWorkspacePress,
+  currentPathname,
+}: {
+  agent: SidebarAgentEntry;
+  serverId: string | null;
+  onWorkspacePress?: () => void;
+  currentPathname: string | null;
+}) {
+  const [importing, setImporting] = useState(false);
+
+  const handlePress = useCallback(() => {
+    if (!serverId || importing) return;
+
+    if (agent.imported) {
+      onWorkspacePress?.();
+      navigateToAgent({ serverId, agentId: agent.agentId, currentPathname });
+      return;
+    }
+
+    // Lazy import: auto-import unimported session on click
+    setImporting(true);
+    const client = getHostRuntimeStore().getClient(serverId);
+    if (!client) {
+      setImporting(false);
+      return;
+    }
+    void client
+      .importAgent({
+        providerId: agent.provider,
+        providerHandleId: agent.agentId,
+      })
+      .then((result) => {
+        onWorkspacePress?.();
+        navigateToAgent({ serverId, agentId: result.id, currentPathname });
+        return result;
+      })
+      .catch(() => {
+        // Silently fail — the session may still be visible for retry
+      })
+      .finally(() => setImporting(false));
+  }, [serverId, importing, agent, onWorkspacePress, currentPathname]);
+
+  const rowStyle = useCallback(
+    ({ pressed }: PressableStateCallbackType) => [
+      sidebarAgentStyles.agentRow,
+      pressed && sidebarAgentStyles.agentRowPressed,
+    ],
+    [],
+  );
+
+  const ProviderIcon = getProviderIcon(agent.provider);
+
+  return (
+    <Pressable style={rowStyle} onPress={handlePress} disabled={importing}>
+      <View style={sidebarAgentStyles.agentIconWrap}>
+        {importing ? (
+          <ThemedActivityIndicator size={10} uniProps={foregroundMutedColorMapping} />
+        ) : (
+          <ProviderIcon size={12} color="#9ca3af" />
+        )}
+      </View>
+      <Text style={sidebarAgentStyles.agentTitle} numberOfLines={1}>
+        {agent.title ?? "Untitled session"}
+      </Text>
+    </Pressable>
+  );
+}
+
+function SidebarAgentSubItems({
+  agents,
+  serverId,
+  onWorkspacePress,
+  currentPathname,
+}: {
+  agents: SidebarAgentEntry[];
+  serverId: string | null;
+  onWorkspacePress?: () => void;
+  currentPathname: string | null;
+}) {
+  return (
+    <View style={sidebarAgentStyles.agentList}>
+      {agents.map((agent) => (
+        <SidebarAgentRow
+          key={agent.agentId}
+          agent={agent}
+          serverId={serverId}
+          onWorkspacePress={onWorkspacePress}
+          currentPathname={currentPathname}
+        />
+      ))}
+    </View>
+  );
+}
+
+const sidebarAgentStyles = StyleSheet.create((theme) => ({
+  agentList: {
+    paddingLeft: theme.spacing[4],
+  },
+  agentRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: theme.spacing[2],
+    paddingVertical: theme.spacing[1],
+    paddingHorizontal: theme.spacing[2],
+    borderRadius: theme.borderRadius.md,
+    minHeight: 28,
+  },
+  agentRowPressed: {
+    backgroundColor: theme.colors.surface2,
+  },
+  agentIconWrap: {
+    width: 14,
+    height: 14,
+    alignItems: "center",
+    justifyContent: "center",
+    flexShrink: 0,
+  },
+  agentTitle: {
+    color: theme.colors.foregroundMuted,
+    fontSize: theme.fontSize.xs,
+    fontWeight: "400",
+    flex: 1,
+    minWidth: 0,
+  },
+}));
+
 function ProjectBlock({
   project,
   collapsed,
@@ -1973,6 +2110,7 @@ function ProjectBlock({
   dragHandleProps,
   useNestable,
   creatingWorkspaceIds,
+  agentsForProject,
 }: {
   project: SidebarProjectEntry;
   collapsed: boolean;
@@ -1993,6 +2131,7 @@ function ProjectBlock({
   dragHandleProps?: DraggableListDragHandleProps;
   useNestable: boolean;
   creatingWorkspaceIds: ReadonlySet<string>;
+  agentsForProject: SidebarAgentEntry[];
 }) {
   const rowModel = useMemo(
     () =>
@@ -2130,28 +2269,46 @@ function ProjectBlock({
     onToggleCollapsed(project.projectKey);
   }, [onToggleCollapsed, project.projectKey]);
 
+  const showAgents = shouldShowAgentSubItems({
+    rowModel,
+    collapsed,
+    agentCount: agentsForProject.length,
+  });
+
   return (
     <View style={styles.projectBlock}>
       {rowModel.kind === "workspace_link" ? (
-        <FlattenedProjectRow
-          project={project}
-          displayName={displayName}
-          iconDataUri={iconDataUri}
-          rowModel={rowModel}
-          onPress={handleFlattenedRowPress}
-          serverId={serverId}
-          onWorkspacePress={onWorkspacePress}
-          onWorktreeCreated={onWorktreeCreated}
-          shortcutNumber={shortcutIndexByWorkspaceKey.get(rowModel.workspace.workspaceKey) ?? null}
-          showShortcutBadge={showShortcutBadges}
-          drag={drag}
-          isDragging={isDragging}
-          dragHandleProps={dragHandleProps}
-          isProjectActive={isProjectActive}
-          onRemoveProject={handleRemoveProject}
-          removeProjectStatus={isRemovingProject ? "pending" : "idle"}
-          selectionEnabled={selectionEnabled}
-        />
+        <>
+          <FlattenedProjectRow
+            project={project}
+            displayName={displayName}
+            iconDataUri={iconDataUri}
+            rowModel={rowModel}
+            onPress={handleFlattenedRowPress}
+            serverId={serverId}
+            onWorkspacePress={onWorkspacePress}
+            onWorktreeCreated={onWorktreeCreated}
+            shortcutNumber={
+              shortcutIndexByWorkspaceKey.get(rowModel.workspace.workspaceKey) ?? null
+            }
+            showShortcutBadge={showShortcutBadges}
+            drag={drag}
+            isDragging={isDragging}
+            dragHandleProps={dragHandleProps}
+            isProjectActive={isProjectActive}
+            onRemoveProject={handleRemoveProject}
+            removeProjectStatus={isRemovingProject ? "pending" : "idle"}
+            selectionEnabled={selectionEnabled}
+          />
+          {showAgents ? (
+            <SidebarAgentSubItems
+              agents={agentsForProject}
+              serverId={serverId}
+              onWorkspacePress={onWorkspacePress}
+              currentPathname={currentPathname}
+            />
+          ) : null}
+        </>
       ) : (
         <>
           <ProjectHeaderRow
@@ -2190,6 +2347,14 @@ function ProjectBlock({
               containerStyle={styles.workspaceListContainer}
             />
           ) : null}
+          {showAgents ? (
+            <SidebarAgentSubItems
+              agents={agentsForProject}
+              serverId={serverId}
+              onWorkspacePress={onWorkspacePress}
+              currentPathname={currentPathname}
+            />
+          ) : null}
         </>
       )}
     </View>
@@ -2226,6 +2391,9 @@ export function SidebarWorkspaceList({
     [pathname],
   );
   const selectionEnabled = isWorkspaceRoute;
+
+  const projectKeys = useMemo(() => projects.map((p) => p.projectKey), [projects]);
+  const agentsByProjectKey = useSidebarAgents(serverId, projectKeys);
 
   const projectIconRequests = useMemo(() => {
     if (!serverId) {
@@ -2445,6 +2613,7 @@ export function SidebarWorkspaceList({
           dragHandleProps={dragHandleProps}
           useNestable={platformIsNative}
           creatingWorkspaceIds={creatingWorkspaceIds}
+          agentsForProject={agentsByProjectKey[item.projectKey] ?? EMPTY_SIDEBAR_AGENTS}
         />
       );
     },
@@ -2462,6 +2631,7 @@ export function SidebarWorkspaceList({
       shortcutIndexByWorkspaceKey,
       showShortcutBadges,
       creatingWorkspaceIds,
+      agentsByProjectKey,
     ],
   );
 

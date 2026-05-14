@@ -678,6 +678,7 @@ export const RecentProviderSessionDescriptorPayloadSchema = z.object({
   firstPromptPreview: z.string().nullable(),
   lastPromptPreview: z.string().nullable(),
   lastActivityAt: z.string(),
+  importedAgentId: z.string().optional(),
 });
 
 export type RecentProviderSessionDescriptorPayload = z.infer<
@@ -935,6 +936,7 @@ export const FetchRecentProviderSessionsRequestMessageSchema = z.object({
   providers: z.array(z.string()).optional(),
   since: z.string().optional(),
   limit: z.number().int().positive().max(200).optional(),
+  lightweight: z.boolean().optional(),
 });
 
 export const FetchAgentRequestMessageSchema = z.object({

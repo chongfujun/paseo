@@ -107,8 +107,8 @@ export async function listImportableProviderSessions(
   const descriptors = await agentManager.listImportablePersistedAgents({
     providerFilter,
     cwd: request.cwd,
+    lightweight: request.lightweight,
   });
-  let filteredAlreadyImportedCount = 0;
   const candidates: PersistedAgentDescriptor[] = [];
   for (const descriptor of descriptors) {
     if (request.cwd && normalizePath(descriptor.cwd) !== normalizePath(request.cwd)) {
@@ -120,24 +120,27 @@ export async function listImportableProviderSessions(
     if (isMetadataGenerationDescriptor(descriptor)) {
       continue;
     }
-    const providerHandleId =
-      descriptor.persistence.nativeHandle ?? descriptor.persistence.sessionId;
-    if (importedHandles.has(toProviderSessionHandleKey(descriptor.provider, providerHandleId))) {
-      filteredAlreadyImportedCount += 1;
-      continue;
-    }
     candidates.push(descriptor);
   }
 
   const entries = candidates
     .sort((a, b) => b.lastActivityAt.getTime() - a.lastActivityAt.getTime())
-    .map((descriptor) =>
-      toRecentProviderSessionDescriptorPayload(descriptor, {
-        providerLabel: providerRegistry[descriptor.provider]?.label ?? descriptor.provider,
-      }),
-    );
+    .map((descriptor) => {
+      const providerHandleId =
+        descriptor.persistence.nativeHandle ?? descriptor.persistence.sessionId;
+      const importedAgentId = importedHandles.get(
+        toProviderSessionHandleKey(descriptor.provider, providerHandleId),
+      );
+      return toRecentProviderSessionDescriptorPayload(
+        descriptor,
+        {
+          providerLabel: providerRegistry[descriptor.provider]?.label ?? descriptor.provider,
+        },
+        importedAgentId,
+      );
+    });
 
-  return { entries, filteredAlreadyImportedCount };
+  return { entries, filteredAlreadyImportedCount: 0 };
 }
 
 export async function importProviderSession(
@@ -295,15 +298,15 @@ function getFirstUserMessageText(timeline: readonly AgentTimelineItem[]): string
 async function collectImportedProviderSessionHandles(
   agentManager: Pick<AgentManager, "listAgents">,
   agentStorage: Pick<AgentStorage, "list">,
-): Promise<Set<string>> {
-  const handles = new Set<string>();
+): Promise<Map<string, string>> {
+  const handles = new Map<string, string>();
 
   for (const agent of agentManager.listAgents()) {
-    collectProviderSessionHandleKeys(handles, agent.provider, agent.persistence);
+    collectProviderSessionHandleKeys(handles, agent.id, agent.provider, agent.persistence);
   }
 
   for (const record of await agentStorage.list()) {
-    collectProviderSessionHandleKeys(handles, record.provider, record.persistence);
+    collectProviderSessionHandleKeys(handles, record.id, record.provider, record.persistence);
   }
 
   return handles;
@@ -322,7 +325,8 @@ function isMetadataGenerationDescriptor(descriptor: PersistedAgentDescriptor): b
 }
 
 function collectProviderSessionHandleKeys(
-  target: Set<string>,
+  target: Map<string, string>,
+  agentId: string,
   provider: AgentProvider | StoredAgentRecord["provider"] | string,
   persistence: AgentPersistenceHandle | null | undefined,
 ): void {
@@ -330,8 +334,8 @@ function collectProviderSessionHandleKeys(
     return;
   }
 
-  target.add(toProviderSessionHandleKey(provider, persistence.sessionId));
+  target.set(toProviderSessionHandleKey(provider, persistence.sessionId), agentId);
   if (persistence.nativeHandle) {
-    target.add(toProviderSessionHandleKey(provider, persistence.nativeHandle));
+    target.set(toProviderSessionHandleKey(provider, persistence.nativeHandle), agentId);
   }
 }

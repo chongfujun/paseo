@@ -15,13 +15,36 @@ export interface SidebarAgentsByProjectKey {
   [projectKey: string]: SidebarAgentEntry[];
 }
 
+function normalizePath(p: string): string {
+  return p.replace(/\\/g, "/").toLowerCase();
+}
+
+function resolveDiscoverableProjectKey(
+  cwd: string,
+  projectKeySet: Set<string>,
+  projectRootPaths?: Map<string, string>,
+): string | undefined {
+  const derived = deriveProjectKey(cwd);
+  if (projectKeySet.has(derived)) return derived;
+  if (!projectRootPaths) return undefined;
+
+  const normalized = normalizePath(cwd);
+  for (const [rootPath, projectKey] of projectRootPaths) {
+    if (normalizePath(rootPath) === normalized && projectKeySet.has(projectKey)) {
+      return projectKey;
+    }
+  }
+  return undefined;
+}
+
 export function deriveSidebarAgents(input: {
   serverId: string | null;
   projectKeys: ReadonlyArray<string>;
   agents: Map<string, Agent> | undefined;
   discoverableSessions: FetchRecentProviderSessionEntry[] | undefined;
+  projectRootPaths?: Map<string, string>;
 }): SidebarAgentsByProjectKey {
-  const { serverId, projectKeys, agents, discoverableSessions } = input;
+  const { serverId, projectKeys, agents, discoverableSessions, projectRootPaths } = input;
   if (!serverId || projectKeys.length === 0) {
     return {};
   }
@@ -29,7 +52,6 @@ export function deriveSidebarAgents(input: {
   const projectKeySet = new Set(projectKeys);
   const result: SidebarAgentsByProjectKey = {};
 
-  // Imported agents
   if (agents && agents.size > 0) {
     for (const agent of agents.values()) {
       if (agent.serverId !== serverId) continue;
@@ -49,12 +71,15 @@ export function deriveSidebarAgents(input: {
     }
   }
 
-  // Discoverable (unimported) sessions
   if (discoverableSessions && discoverableSessions.length > 0) {
     for (const session of discoverableSessions) {
       if (session.importedAgentId) continue;
-      const projectKey = deriveProjectKey(session.cwd);
-      if (!projectKeySet.has(projectKey)) continue;
+      const projectKey = resolveDiscoverableProjectKey(
+        session.cwd,
+        projectKeySet,
+        projectRootPaths,
+      );
+      if (!projectKey) continue;
 
       if (!result[projectKey]) {
         result[projectKey] = [];
@@ -75,6 +100,7 @@ export function deriveSidebarAgents(input: {
 export function useSidebarAgents(
   serverId: string | null,
   projectKeys: ReadonlyArray<string>,
+  projectRootPaths?: Map<string, string>,
 ): SidebarAgentsByProjectKey {
   const agents = useSessionStore((state) =>
     serverId ? state.sessions[serverId]?.agents : undefined,
@@ -84,7 +110,14 @@ export function useSidebarAgents(
   );
 
   return useMemo(
-    () => deriveSidebarAgents({ serverId, projectKeys, agents, discoverableSessions }),
-    [serverId, projectKeys, agents, discoverableSessions],
+    () =>
+      deriveSidebarAgents({
+        serverId,
+        projectKeys,
+        agents,
+        discoverableSessions,
+        projectRootPaths,
+      }),
+    [serverId, projectKeys, agents, discoverableSessions, projectRootPaths],
   );
 }

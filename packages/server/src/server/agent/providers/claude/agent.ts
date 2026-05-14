@@ -1247,8 +1247,9 @@ export class ClaudeAgentClient implements AgentClient {
       return [];
     }
     const candidates = await collectRecentClaudeSessions(projectsRoot, options?.cwd);
+    const limited = options?.limit ? candidates.slice(0, options.limit * 3) : candidates;
     const parsed = await Promise.all(
-      candidates.map((candidate) =>
+      limited.map((candidate) =>
         parseClaudeSessionDescriptor(candidate.path, candidate.mtime, {
           lightweight: options?.lightweight,
         }),
@@ -4413,6 +4414,22 @@ async function pathExists(target: string): Promise<boolean> {
   }
 }
 
+async function readFirstLines(filePath: string): Promise<string> {
+  const handle = await fsPromises.open(filePath, "r");
+  try {
+    const chunks: Buffer[] = [];
+    for await (const chunk of handle.createReadStream({ highWaterMark: 64 * 1024 })) {
+      chunks.push(chunk);
+      if (Buffer.concat(chunks).toString("utf8").split(/\r?\n/).filter(Boolean).length >= 50) {
+        break;
+      }
+    }
+    return Buffer.concat(chunks).toString("utf8");
+  } finally {
+    await handle.close();
+  }
+}
+
 async function collectRecentClaudeSessions(
   root: string,
   cwd?: string,
@@ -4523,14 +4540,16 @@ export async function parseClaudeSessionDescriptor(
   mtime: Date,
   options?: { lightweight?: boolean },
 ): Promise<PersistedAgentDescriptor | null> {
+  const lightweight = options?.lightweight ?? false;
+
   let content: string;
   try {
-    content = await fsPromises.readFile(filePath, "utf8");
+    content = lightweight
+      ? await readFirstLines(filePath)
+      : await fsPromises.readFile(filePath, "utf8");
   } catch {
     return null;
   }
-
-  const lightweight = options?.lightweight ?? false;
 
   const acc: ClaudeSessionDescriptorAccumulator = {
     sessionId: null,

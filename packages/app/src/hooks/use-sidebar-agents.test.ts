@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { deriveSidebarAgents, type SidebarAgentsByProjectKey } from "./use-sidebar-agents";
+import { deriveSidebarAgents } from "./use-sidebar-agents";
 import type { Agent } from "@/stores/session-store";
 
 function makeAgent(overrides: Partial<Agent> & { id: string; serverId: string }): Agent {
@@ -495,5 +495,63 @@ describe("deriveSidebarAgents", () => {
     const discoverable = result["/project"].find((a) => !a.imported);
     expect(imported!.agentId).toBe("a1");
     expect(discoverable!.agentId).toBe("handle-y");
+  });
+
+  it("matches discoverable session by projectRootPath when projectKey is remote-based", () => {
+    const result = deriveSidebarAgents({
+      serverId: "s1",
+      projectKeys: ["remote:github.com/acme/my-project"],
+      agents: new Map(),
+      discoverableSessions: [
+        makeDiscoverable({
+          providerHandleId: "handle-remote",
+          cwd: "/home/user/my-project",
+          title: "Remote project session",
+        }),
+      ],
+      projectRootPaths: new Map([["/home/user/my-project", "remote:github.com/acme/my-project"]]),
+    });
+
+    expect(result["remote:github.com/acme/my-project"]).toHaveLength(1);
+    expect(result["remote:github.com/acme/my-project"][0].agentId).toBe("handle-remote");
+    expect(result["remote:github.com/acme/my-project"][0].imported).toBe(false);
+  });
+
+  it("does not match discoverable session when projectRootPaths is absent and projectKey is remote-based", () => {
+    const result = deriveSidebarAgents({
+      serverId: "s1",
+      projectKeys: ["remote:github.com/acme/my-project"],
+      agents: new Map(),
+      discoverableSessions: [
+        makeDiscoverable({
+          providerHandleId: "handle-remote",
+          cwd: "/home/user/my-project",
+          title: "Remote project session",
+        }),
+      ],
+    });
+
+    expect(result).toEqual({});
+  });
+
+  it("matches discoverable session with case-insensitive Windows path", () => {
+    const result = deriveSidebarAgents({
+      serverId: "s1",
+      projectKeys: ["remote:github.com/acme/my-project"],
+      agents: new Map(),
+      discoverableSessions: [
+        makeDiscoverable({
+          providerHandleId: "handle-win",
+          cwd: "d:\\Users\\dev\\my-project",
+          title: "Windows session",
+        }),
+      ],
+      projectRootPaths: new Map([
+        ["D:\\Users\\dev\\my-project", "remote:github.com/acme/my-project"],
+      ]),
+    });
+
+    expect(result["remote:github.com/acme/my-project"]).toHaveLength(1);
+    expect(result["remote:github.com/acme/my-project"][0].agentId).toBe("handle-win");
   });
 });

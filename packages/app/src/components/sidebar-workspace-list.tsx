@@ -2393,7 +2393,17 @@ export function SidebarWorkspaceList({
   const selectionEnabled = isWorkspaceRoute;
 
   const projectKeys = useMemo(() => projects.map((p) => p.projectKey), [projects]);
-  const agentsByProjectKey = useSidebarAgents(serverId, projectKeys);
+  const projectRootPaths = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const project of projects) {
+      const rootPath = project.iconWorkingDir.trim();
+      if (rootPath) {
+        map.set(rootPath, project.projectKey);
+      }
+    }
+    return map;
+  }, [projects]);
+  const agentsByProjectKey = useSidebarAgents(serverId, projectKeys, projectRootPaths);
 
   const projectIconRequests = useMemo(() => {
     if (!serverId) {

@@ -108,6 +108,7 @@ export async function listImportableProviderSessions(
     providerFilter,
     cwd: request.cwd,
     lightweight: request.lightweight,
+    limit: request.limit,
   });
   const candidates: PersistedAgentDescriptor[] = [];
   for (const descriptor of descriptors) {

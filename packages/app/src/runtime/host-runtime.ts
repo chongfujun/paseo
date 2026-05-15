@@ -1754,7 +1754,6 @@ export class HostRuntimeStore {
           page: { limit: DEFAULT_AGENT_DIRECTORY_PAGE_LIMIT },
         }),
       )
-      .then(() => this.refreshDiscoverableSessions(serverId))
       .then(() => undefined)
       .catch((error) => {
         console.error("[HostRuntime] agent directory bootstrap failed", {
@@ -1770,22 +1769,6 @@ export class HostRuntimeStore {
       });
 
     this.agentDirectoryBootstrapInFlight.set(serverId, bootstrap);
-  }
-
-  private async refreshDiscoverableSessions(serverId: string): Promise<void> {
-    const client = this.controllers.get(serverId)?.getClient();
-    if (!client) return;
-    try {
-      const result = await client.fetchRecentProviderSessions({
-        lightweight: true,
-      });
-      useSessionStore.getState().setDiscoverableSessions(serverId, result.entries);
-    } catch (error) {
-      console.warn("[HostRuntime] discoverable sessions fetch failed", {
-        serverId,
-        error: toErrorMessage(error),
-      });
-    }
   }
 
   getSnapshot(serverId: string): HostRuntimeSnapshot | null {

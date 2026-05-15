@@ -103,17 +103,24 @@ export interface SidebarAgentEntry {
 In the imported agent branch (~line 43), add `cwd: agent.cwd`.
 In the unimported session branch (~line 61), add `cwd: session.cwd`.
 
-- [ ] **Step 4: Run all tests**
+- [ ] **Step 4: Update existing test assertions to include `cwd`**
+
+Two existing tests use `toEqual` with full object literals that lack `cwd`. Add `cwd` to the expected objects:
+
+- Line ~140: "matches agent to project by projectPlacement.projectKey" — add `cwd: "/project"` to the expected object
+- Line ~429: "includes discoverable sessions from store bucket" — add `cwd: "/home/user/my-project"` to the expected object
+
+- [ ] **Step 5: Run all tests**
 
 Run: `npx vitest run packages/app/src/hooks/use-sidebar-agents.test.ts --reporter=verbose`
 Expected: ALL PASS
 
-- [ ] **Step 5: Run typecheck**
+- [ ] **Step 6: Run typecheck**
 
 Run: `npm run typecheck`
-Expected: Failures in `sidebar-workspace-list.tsx` (references to `agent.cwd` or `SidebarAgentEntry` — these are in Task 3)
+Expected: Failures in `sidebar-workspace-list.tsx` (references to `agent.cwd` or `SidebarAgentEntry` — these are in Task 4)
 
-- [ ] **Step 6: Commit**
+- [ ] **Step 7: Commit**
 
 ```bash
 git add packages/app/src/hooks/use-sidebar-agents.ts packages/app/src/hooks/use-sidebar-agents.test.ts
@@ -317,6 +324,12 @@ Add context menu via `onContextMenu` on the Pressable (web only, graceful no-op 
 <Pressable
   style={rowStyle}
   onPress={handlePress}
+  onLongPress={() => {
+    if (!agent.imported) return;
+    setRenaming(true);
+    setRenameValue(agent.title ?? "");
+  }}
+  // @ts-ignore - onContextMenu is web-only and not in RN types.
   onContextMenu={(e) => {
     if (!agent.imported) return;
     e.preventDefault();

@@ -284,8 +284,11 @@ export interface SessionState {
   agentDetails: Map<string, Agent>;
   workspaces: Map<string, WorkspaceDescriptor>;
 
-  // Discoverable (unimported) provider sessions
-  discoverableSessions: FetchRecentProviderSessionEntry[];
+  // Discoverable (unimported) provider sessions, keyed by project
+  discoverableSessionsByProject: Record<
+    string,
+    { entries: FetchRecentProviderSessionEntry[]; fetched: boolean }
+  >;
 
   // Permissions
   pendingPermissions: Map<string, PendingPermission>;
@@ -399,7 +402,16 @@ interface SessionStoreActions {
   removeWorkspace: (serverId: string, workspaceId: string) => void;
 
   // Discoverable sessions
-  setDiscoverableSessions: (serverId: string, sessions: FetchRecentProviderSessionEntry[]) => void;
+  setDiscoverableSessionsForProject: (
+    serverId: string,
+    projectKey: string,
+    sessions: FetchRecentProviderSessionEntry[],
+  ) => void;
+  removeDiscoverableSession: (
+    serverId: string,
+    projectKey: string,
+    providerHandleId: string,
+  ) => void;
 
   // Agent activity timestamps
   setAgentLastActivity: (agentId: string, timestamp: Date) => void;
@@ -470,7 +482,7 @@ function createInitialSessionState(serverId: string, client: DaemonClient): Sess
     agents: new Map(),
     agentDetails: new Map(),
     workspaces: new Map(),
-    discoverableSessions: [],
+    discoverableSessionsByProject: {},
     pendingPermissions: new Map(),
     fileExplorer: new Map(),
     queuedMessages: new Map(),
@@ -1142,7 +1154,7 @@ export const useSessionStore = create<SessionStore>()(
         });
       },
 
-      setDiscoverableSessions: (serverId, sessions) => {
+      setDiscoverableSessionsForProject: (serverId, projectKey, sessions) => {
         set((prev) => {
           const session = prev.sessions[serverId];
           if (!session) return prev;
@@ -1150,7 +1162,39 @@ export const useSessionStore = create<SessionStore>()(
             ...prev,
             sessions: {
               ...prev.sessions,
-              [serverId]: { ...session, discoverableSessions: sessions },
+              [serverId]: {
+                ...session,
+                discoverableSessionsByProject: {
+                  ...session.discoverableSessionsByProject,
+                  [projectKey]: { entries: sessions, fetched: true },
+                },
+              },
+            },
+          };
+        });
+      },
+      removeDiscoverableSession: (serverId, projectKey, providerHandleId) => {
+        set((prev) => {
+          const session = prev.sessions[serverId];
+          if (!session) return prev;
+          const existing = session.discoverableSessionsByProject[projectKey];
+          if (!existing) return prev;
+          return {
+            ...prev,
+            sessions: {
+              ...prev.sessions,
+              [serverId]: {
+                ...session,
+                discoverableSessionsByProject: {
+                  ...session.discoverableSessionsByProject,
+                  [projectKey]: {
+                    ...existing,
+                    entries: existing.entries.filter(
+                      (e) => e.providerHandleId !== providerHandleId,
+                    ),
+                  },
+                },
+              },
             },
           };
         });

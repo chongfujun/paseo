@@ -13,7 +13,7 @@ Before (broken):
   Startup → fetch ALL sessions from ALL projects → store globally → sidebar filters by project
 
 After:
-  Sidebar renders project → async request (cwd + limit:10 + lightweight:true) → data arrives → render
+  Sidebar renders project → async request (cwd + limit:200 + lightweight:true) → data arrives → render
   Each project loads independently and in parallel
   User sees content appear naturally, no waiting
 ```
@@ -42,19 +42,19 @@ discoverableSessionsByProject: {
 
 - `useSidebarAgents` reads from `state.sessions[serverId]?.discoverableSessionsByProject[projectKey]`
 - Sidebar checks `fetched` before requesting; skips if already loaded
-- "Load more" appends to `entries` without replacing
 - Empty projects show nothing until data arrives; no placeholder rows
+- `fetched` is a one-time flag per project per app session; no invalidation or re-fetch (out of scope)
 
 ### Fetch trigger mechanism
 
 The per-project fetch is triggered by a new `useDiscoverableSessions(serverId, projectKey, cwd)` hook. This hook uses Tanstack Query (already used in the app) to:
 
 1. On mount, check `fetched` flag in store
-2. If not fetched, call `client.fetchRecentProviderSessions({ cwd, lightweight: true, limit: 10 })`
+2. If not fetched, call `client.fetchRecentProviderSessions({ cwd, lightweight: true, limit: 200 })`
 3. On success, write results to `discoverableSessionsByProject[projectKey]` and set `fetched = true`
 4. Return the entries for the caller to use
 
-The hook is called once per project row in the sidebar component. Tanstack Query handles deduplication and caching.
+The hook is called once per project row in the sidebar component. Tanstack Query handles deduplication and caching. The fetch uses `limit: 200` (the schema max) because per-project directories typically have far fewer than 200 sessions, and fetching all at once avoids the need for server-side pagination.
 
 ### Server-side
 
@@ -62,19 +62,19 @@ No server changes needed. The existing `fetch_recent_provider_sessions_request` 
 
 ### Pagination ("load more")
 
-The current RPC supports `limit` but has no offset/cursor. For "load more":
+Pagination is purely client-side:
 
-- Client fetches initial batch with `limit: 10`
-- On "load more", client sends `since` parameter with the `lastActivityAt` of the last entry in the current list, plus `limit: 10`
-- Server already supports `since` filtering (filters by `descriptor.lastActivityAt < sinceTimestamp`)
-- Results are appended to the existing `entries` array in the store
+- Fetch all sessions for a project in one request (`limit: 200`)
+- Sidebar initially displays only the 10 most recent
+- "Load more" reveals the next 10 from the already-fetched list
+- No additional server requests needed
 
-This avoids the need for a new server-side pagination mechanism.
+Since per-project directories contain far fewer files than the previous bulk scan, fetching up to 200 at once is fast and keeps the UI simple.
 
 ### Sidebar display
 
 - Show the 10 most recent unimported sessions per project by default
-- If more than 10 exist, show a "load more" button that fetches the next batch
+- If more than 10 are fetched, show a "load more" button that reveals the next 10 from the local list
 - Unimported sessions have a subtle visual distinction from imported agents (e.g., different icon)
 - Imported and unimported sessions are merged in the same list under each project
 - `deriveSidebarAgents` merges both lists, using `importedAgentId` field to skip entries that have already been imported (deduplication)
@@ -92,13 +92,12 @@ When the user clicks an unimported session:
 
 ### Files to change
 
-| File                                                     | Change                                                                           |
-| -------------------------------------------------------- | -------------------------------------------------------------------------------- |
-| `packages/app/src/runtime/host-runtime.ts`               | Remove `refreshDiscoverableSessions` from bootstrap                              |
-| `packages/app/src/stores/session-store.ts`               | Change `discoverableSessions` to per-project structure                           |
-| `packages/app/src/hooks/use-sidebar-agents.ts`           | Read from per-project store; add `useDiscoverableSessions` hook                  |
-| `packages/app/src/components/sidebar-workspace-list.tsx` | Call `useDiscoverableSessions` per project row; "load more" button               |
-| `packages/server/src/server/agent/import-sessions.ts`    | Remove the `effectiveLimit` safety net (no longer needed with per-project fetch) |
+| File                                                     | Change                                                             |
+| -------------------------------------------------------- | ------------------------------------------------------------------ |
+| `packages/app/src/runtime/host-runtime.ts`               | Remove `refreshDiscoverableSessions` from bootstrap                |
+| `packages/app/src/stores/session-store.ts`               | Change `discoverableSessions` to per-project structure             |
+| `packages/app/src/hooks/use-sidebar-agents.ts`           | Read from per-project store; add `useDiscoverableSessions` hook    |
+| `packages/app/src/components/sidebar-workspace-list.tsx` | Call `useDiscoverableSessions` per project row; "load more" button |
 
 ### Out of scope
 

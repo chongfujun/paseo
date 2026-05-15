@@ -1,9 +1,9 @@
 import { useMemo } from "react";
 import { useSessionStore, type Agent } from "@/stores/session-store";
 import type { FetchRecentProviderSessionEntry } from "@server/client/daemon-client";
-import { deriveProjectKey } from "@/utils/agent-grouping";
 
 export interface SidebarAgentEntry {
+  projectKey: string;
   agentId: string;
   title: string | null;
   provider: string;
@@ -15,53 +15,33 @@ export interface SidebarAgentsByProjectKey {
   [projectKey: string]: SidebarAgentEntry[];
 }
 
-function normalizePath(p: string): string {
-  return p.replace(/\\/g, "/").toLowerCase();
-}
-
-function resolveDiscoverableProjectKey(
-  cwd: string,
-  projectKeySet: Set<string>,
-  projectRootPaths?: Map<string, string>,
-): string | undefined {
-  const derived = deriveProjectKey(cwd);
-  if (projectKeySet.has(derived)) return derived;
-  if (!projectRootPaths) return undefined;
-
-  const normalized = normalizePath(cwd);
-  for (const [rootPath, projectKey] of projectRootPaths) {
-    if (normalizePath(rootPath) === normalized && projectKeySet.has(projectKey)) {
-      return projectKey;
-    }
-  }
-  return undefined;
-}
-
 export function deriveSidebarAgents(input: {
   serverId: string | null;
   projectKeys: ReadonlyArray<string>;
   agents: Map<string, Agent> | undefined;
-  discoverableSessions: FetchRecentProviderSessionEntry[] | undefined;
-  projectRootPaths?: Map<string, string>;
+  discoverableSessionsByProject: Record<
+    string,
+    { entries: FetchRecentProviderSessionEntry[]; fetched: boolean } | undefined
+  >;
 }): SidebarAgentsByProjectKey {
-  const { serverId, projectKeys, agents, discoverableSessions, projectRootPaths } = input;
+  const { serverId, projectKeys, agents, discoverableSessionsByProject } = input;
   if (!serverId || projectKeys.length === 0) {
     return {};
   }
 
-  const projectKeySet = new Set(projectKeys);
   const result: SidebarAgentsByProjectKey = {};
 
   if (agents && agents.size > 0) {
     for (const agent of agents.values()) {
       if (agent.serverId !== serverId) continue;
       const projectKey = agent.projectPlacement?.projectKey;
-      if (!projectKey || !projectKeySet.has(projectKey)) continue;
+      if (!projectKey || !projectKeys.includes(projectKey)) continue;
 
       if (!result[projectKey]) {
         result[projectKey] = [];
       }
       result[projectKey].push({
+        projectKey,
         agentId: agent.id,
         title: agent.title,
         provider: agent.provider,
@@ -71,20 +51,15 @@ export function deriveSidebarAgents(input: {
     }
   }
 
-  if (discoverableSessions && discoverableSessions.length > 0) {
-    for (const session of discoverableSessions) {
+  for (const [projectKey, bucket] of Object.entries(discoverableSessionsByProject)) {
+    if (!bucket || !bucket.entries.length) continue;
+    for (const session of bucket.entries) {
       if (session.importedAgentId) continue;
-      const projectKey = resolveDiscoverableProjectKey(
-        session.cwd,
-        projectKeySet,
-        projectRootPaths,
-      );
-      if (!projectKey) continue;
-
       if (!result[projectKey]) {
         result[projectKey] = [];
       }
       result[projectKey].push({
+        projectKey,
         agentId: session.providerHandleId,
         title: session.title ?? session.firstPromptPreview,
         provider: session.providerId,
@@ -100,13 +75,12 @@ export function deriveSidebarAgents(input: {
 export function useSidebarAgents(
   serverId: string | null,
   projectKeys: ReadonlyArray<string>,
-  projectRootPaths?: Map<string, string>,
 ): SidebarAgentsByProjectKey {
   const agents = useSessionStore((state) =>
     serverId ? state.sessions[serverId]?.agents : undefined,
   );
-  const discoverableSessions = useSessionStore((state) =>
-    serverId ? state.sessions[serverId]?.discoverableSessions : undefined,
+  const discoverableSessionsByProject = useSessionStore((state) =>
+    serverId ? (state.sessions[serverId]?.discoverableSessionsByProject ?? {}) : {},
   );
 
   return useMemo(
@@ -115,9 +89,8 @@ export function useSidebarAgents(
         serverId,
         projectKeys,
         agents,
-        discoverableSessions,
-        projectRootPaths,
+        discoverableSessionsByProject,
       }),
-    [serverId, projectKeys, agents, discoverableSessions, projectRootPaths],
+    [serverId, projectKeys, agents, discoverableSessionsByProject],
   );
 }

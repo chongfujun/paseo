@@ -43,23 +43,25 @@ function makeDiscoverable(
     importedAgentId: string | undefined;
     providerLabel: string;
   }>,
-): NonNullable<Parameters<typeof deriveSidebarAgents>[0]["discoverableSessions"]>[number] {
+) {
   return {
     providerId: "claude",
     providerHandleId: "handle-1",
     cwd: "/project",
-    title: null,
-    firstPromptPreview: null,
-    lastPromptPreview: null,
+    title: null as string | null,
+    firstPromptPreview: null as string | null,
+    lastPromptPreview: null as string | null,
     lastActivityAt: new Date().toISOString(),
-    importedAgentId: undefined,
+    importedAgentId: undefined as string | undefined,
     providerLabel: "Claude",
     ...overrides,
   };
 }
 
 const defaultInput = {
-  discoverableSessions: [] as Parameters<typeof deriveSidebarAgents>[0]["discoverableSessions"],
+  discoverableSessionsByProject: {} as Parameters<
+    typeof deriveSidebarAgents
+  >[0]["discoverableSessionsByProject"],
 };
 
 describe("deriveSidebarAgents", () => {
@@ -137,7 +139,14 @@ describe("deriveSidebarAgents", () => {
 
     expect(result).toEqual({
       proj1: [
-        { agentId: "a1", title: "Fix bug", provider: "claude", status: "idle", imported: true },
+        {
+          projectKey: "proj1",
+          agentId: "a1",
+          title: "Fix bug",
+          provider: "claude",
+          status: "idle",
+          imported: true,
+        },
       ],
     });
   });
@@ -397,22 +406,28 @@ describe("deriveSidebarAgents", () => {
     expect(result.proj1[0].title).toBeNull();
   });
 
-  it("includes discoverable sessions matched by cwd", () => {
+  it("includes discoverable sessions from store bucket", () => {
     const result = deriveSidebarAgents({
       serverId: "s1",
       projectKeys: ["/home/user/my-project"],
       agents: new Map(),
-      discoverableSessions: [
-        makeDiscoverable({
-          providerHandleId: "handle-x",
-          cwd: "/home/user/my-project",
-          title: "Discoverable session",
-        }),
-      ],
+      discoverableSessionsByProject: {
+        "/home/user/my-project": {
+          entries: [
+            makeDiscoverable({
+              providerHandleId: "handle-x",
+              cwd: "/home/user/my-project",
+              title: "Discoverable session",
+            }),
+          ],
+          fetched: true,
+        },
+      },
     });
 
     expect(result["/home/user/my-project"]).toHaveLength(1);
     expect(result["/home/user/my-project"][0]).toEqual({
+      projectKey: "/home/user/my-project",
       agentId: "handle-x",
       title: "Discoverable session",
       provider: "claude",
@@ -426,27 +441,17 @@ describe("deriveSidebarAgents", () => {
       serverId: "s1",
       projectKeys: ["/project"],
       agents: new Map(),
-      discoverableSessions: [
-        makeDiscoverable({
-          cwd: "/project",
-          importedAgentId: "existing-agent-id",
-        }),
-      ],
-    });
-
-    expect(result).toEqual({});
-  });
-
-  it("excludes discoverable sessions not matching any projectKey", () => {
-    const result = deriveSidebarAgents({
-      serverId: "s1",
-      projectKeys: ["/project-a"],
-      agents: new Map(),
-      discoverableSessions: [
-        makeDiscoverable({
-          cwd: "/project-b",
-        }),
-      ],
+      discoverableSessionsByProject: {
+        "/project": {
+          entries: [
+            makeDiscoverable({
+              cwd: "/project",
+              importedAgentId: "existing-agent-id",
+            }),
+          ],
+          fetched: true,
+        },
+      },
     });
 
     expect(result).toEqual({});
@@ -481,13 +486,18 @@ describe("deriveSidebarAgents", () => {
       serverId: "s1",
       projectKeys: ["/project"],
       agents,
-      discoverableSessions: [
-        makeDiscoverable({
-          providerHandleId: "handle-y",
-          cwd: "/project",
-          title: "Not yet imported",
-        }),
-      ],
+      discoverableSessionsByProject: {
+        "/project": {
+          entries: [
+            makeDiscoverable({
+              providerHandleId: "handle-y",
+              cwd: "/project",
+              title: "Not yet imported",
+            }),
+          ],
+          fetched: true,
+        },
+      },
     });
 
     expect(result["/project"]).toHaveLength(2);
@@ -495,63 +505,5 @@ describe("deriveSidebarAgents", () => {
     const discoverable = result["/project"].find((a) => !a.imported);
     expect(imported!.agentId).toBe("a1");
     expect(discoverable!.agentId).toBe("handle-y");
-  });
-
-  it("matches discoverable session by projectRootPath when projectKey is remote-based", () => {
-    const result = deriveSidebarAgents({
-      serverId: "s1",
-      projectKeys: ["remote:github.com/acme/my-project"],
-      agents: new Map(),
-      discoverableSessions: [
-        makeDiscoverable({
-          providerHandleId: "handle-remote",
-          cwd: "/home/user/my-project",
-          title: "Remote project session",
-        }),
-      ],
-      projectRootPaths: new Map([["/home/user/my-project", "remote:github.com/acme/my-project"]]),
-    });
-
-    expect(result["remote:github.com/acme/my-project"]).toHaveLength(1);
-    expect(result["remote:github.com/acme/my-project"][0].agentId).toBe("handle-remote");
-    expect(result["remote:github.com/acme/my-project"][0].imported).toBe(false);
-  });
-
-  it("does not match discoverable session when projectRootPaths is absent and projectKey is remote-based", () => {
-    const result = deriveSidebarAgents({
-      serverId: "s1",
-      projectKeys: ["remote:github.com/acme/my-project"],
-      agents: new Map(),
-      discoverableSessions: [
-        makeDiscoverable({
-          providerHandleId: "handle-remote",
-          cwd: "/home/user/my-project",
-          title: "Remote project session",
-        }),
-      ],
-    });
-
-    expect(result).toEqual({});
-  });
-
-  it("matches discoverable session with case-insensitive Windows path", () => {
-    const result = deriveSidebarAgents({
-      serverId: "s1",
-      projectKeys: ["remote:github.com/acme/my-project"],
-      agents: new Map(),
-      discoverableSessions: [
-        makeDiscoverable({
-          providerHandleId: "handle-win",
-          cwd: "d:\\Users\\dev\\my-project",
-          title: "Windows session",
-        }),
-      ],
-      projectRootPaths: new Map([
-        ["D:\\Users\\dev\\my-project", "remote:github.com/acme/my-project"],
-      ]),
-    });
-
-    expect(result["remote:github.com/acme/my-project"]).toHaveLength(1);
-    expect(result["remote:github.com/acme/my-project"][0].agentId).toBe("handle-win");
   });
 });

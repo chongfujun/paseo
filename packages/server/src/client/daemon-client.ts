@@ -1921,6 +1921,7 @@ export class DaemonClient {
   async resumeAgent(
     handle: AgentPersistenceHandle,
     overrides?: Partial<AgentSessionConfig>,
+    options?: { skipTimelineHydration?: boolean },
   ): Promise<AgentSnapshotPayload> {
     const requestId = this.createRequestId();
     const message = SessionInboundMessageSchema.parse({
@@ -1928,6 +1929,7 @@ export class DaemonClient {
       requestId,
       handle,
       ...(overrides ? { overrides } : {}),
+      ...(options?.skipTimelineHydration ? { skipTimelineHydration: true } : {}),
     });
 
     const status = await this.sendRequest({

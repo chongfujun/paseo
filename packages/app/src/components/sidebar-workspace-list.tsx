@@ -2346,18 +2346,6 @@ function ProjectBlock({
     })();
   }, [isRemovingProject, serverId, displayName, toast, project.workspaces]);
 
-  const flattenedRowWorkspaceId =
-    rowModel.kind === "workspace_link" ? rowModel.workspace.workspaceId : null;
-  const handleFlattenedRowPress = useCallback(() => {
-    if (!serverId || !flattenedRowWorkspaceId) {
-      return;
-    }
-    onWorkspacePress?.();
-    navigateToWorkspace(serverId, flattenedRowWorkspaceId, {
-      currentPathname,
-    });
-  }, [serverId, flattenedRowWorkspaceId, onWorkspacePress, currentPathname]);
-
   const handleToggleCollapsed = useCallback(() => {
     onToggleCollapsed(project.projectKey);
   }, [onToggleCollapsed, project.projectKey]);
@@ -2377,7 +2365,7 @@ function ProjectBlock({
             displayName={displayName}
             iconDataUri={iconDataUri}
             rowModel={rowModel}
-            onPress={handleFlattenedRowPress}
+            onPress={handleToggleCollapsed}
             serverId={serverId}
             onWorkspacePress={onWorkspacePress}
             onWorktreeCreated={onWorktreeCreated}

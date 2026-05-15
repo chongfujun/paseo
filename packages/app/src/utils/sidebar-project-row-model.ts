@@ -6,7 +6,7 @@ import type {
 export interface SidebarProjectWorkspaceLinkRowModel {
   kind: "workspace_link";
   workspace: SidebarWorkspaceEntry;
-  chevron: null;
+  chevron: "expand" | "collapse" | null;
   trailingAction: "new_worktree" | "none";
 }
 
@@ -30,7 +30,6 @@ export function shouldShowAgentSubItems(input: {
   agentCount: number;
 }): boolean {
   if (input.agentCount === 0) return false;
-  if (input.rowModel.kind === "workspace_link") return true;
   return !input.collapsed;
 }
 
@@ -43,10 +42,11 @@ export function buildSidebarProjectRowModel(input: {
     : null;
 
   if (flattenedWorkspace) {
+    const chevron: "expand" | "collapse" | null = input.collapsed ? "expand" : "collapse";
     return {
       kind: "workspace_link",
       workspace: flattenedWorkspace,
-      chevron: null,
+      chevron,
       trailingAction: input.project.projectKind === "git" ? "new_worktree" : "none",
     };
   }

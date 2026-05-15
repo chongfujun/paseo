@@ -1,5 +1,5 @@
 import type { Agent } from "@/stores/session-store";
 
-export function shouldAutoOpenAgentTab(agent: Pick<Agent, "parentAgentId">): boolean {
-  return !agent.parentAgentId;
+export function shouldAutoOpenAgentTab(_agent: Pick<Agent, "parentAgentId">): boolean {
+  return false;
 }

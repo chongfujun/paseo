@@ -3045,7 +3045,7 @@ export class Session {
   private async handleResumeAgentRequest(
     msg: Extract<SessionInboundMessage, { type: "resume_agent_request" }>,
   ): Promise<void> {
-    const { handle, overrides, requestId } = msg;
+    const { handle, overrides, requestId, skipTimelineHydration } = msg;
     if (!handle) {
       this.sessionLogger.warn("Resume request missing persistence handle");
       this.emit({
@@ -3067,7 +3067,9 @@ export class Session {
       await this.unarchiveAgentByHandle(handle);
       const snapshot = await this.agentManager.resumeAgentFromPersistence(handle, overrides);
       await unarchiveAgentState(this.agentStorage, this.agentManager, snapshot.id);
-      await this.agentManager.hydrateTimelineFromProvider(snapshot.id);
+      if (!skipTimelineHydration) {
+        await this.agentManager.hydrateTimelineFromProvider(snapshot.id);
+      }
       await this.forwardAgentUpdate(snapshot);
       const timelineSize = this.agentManager.getTimeline(snapshot.id).length;
       if (requestId) {

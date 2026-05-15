@@ -1089,6 +1089,7 @@ export const ResumeAgentRequestMessageSchema = z.object({
   type: z.literal("resume_agent_request"),
   handle: AgentPersistenceHandleSchema,
   overrides: AgentSessionConfigSchema.partial().optional(),
+  skipTimelineHydration: z.boolean().optional(),
   requestId: z.string(),
 });
 

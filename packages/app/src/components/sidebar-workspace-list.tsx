@@ -42,12 +42,14 @@ import {
   FolderGit2,
   GitPullRequest,
   Globe,
+  Search,
   Settings,
   SquareTerminal,
   Monitor,
   MoreVertical,
   Plus,
   Trash2,
+  X,
 } from "lucide-react-native";
 import { NestableScrollContainer } from "react-native-draggable-flatlist";
 import { DraggableList, type DraggableRenderItemInfo } from "./draggable-list";
@@ -2005,19 +2007,22 @@ function SidebarAgentRow({
           nativeHandle: agent.agentId,
           metadata: { provider: agent.provider, cwd: agent.cwd },
         },
-        undefined,
-        { skipTimelineHydration: true },
+        agent.title ? { title: agent.title } : undefined,
       )
       .then((result) => {
         useSessionStore
           .getState()
           .removeDiscoverableSession(serverId, agent.projectKey, agent.agentId);
-        onWorkspacePress?.();
-        navigateToAgent({ serverId, agentId: result.id, currentPathname });
+        navigateToAgent({
+          serverId,
+          agentId: result.id,
+          currentPathname,
+          cwd: agent.cwd,
+        });
         return result;
       })
-      .catch(() => {
-        // Silently fail — the session may still be visible for retry
+      .catch((err) => {
+        console.error("[SidebarAgentRow] resumeAgent failed:", err);
       })
       .finally(() => setImporting(false));
   }, [serverId, importing, agent, onWorkspacePress, currentPathname]);
@@ -2481,7 +2486,32 @@ export function SidebarWorkspaceList({
   const selectionEnabled = isWorkspaceRoute;
 
   const projectKeys = useMemo(() => projects.map((p) => p.projectKey), [projects]);
-  const agentsByProjectKey = useSidebarAgents(serverId, projectKeys);
+  const projectWorkspaceDirs = useMemo(
+    () => new Map(projects.map((p) => [p.projectKey, p.iconWorkingDir])),
+    [projects],
+  );
+  const agentsByProjectKey = useSidebarAgents(serverId, projectKeys, projectWorkspaceDirs);
+  const hasAnyAgents = useMemo(
+    () => Object.values(agentsByProjectKey).some((agents) => agents && agents.length > 0),
+    [agentsByProjectKey],
+  );
+  const [sessionSearchQuery, setSessionSearchQuery] = useState("");
+  const filteredAgentsByProjectKey = useMemo(() => {
+    if (!sessionSearchQuery.trim()) return agentsByProjectKey;
+    const q = sessionSearchQuery.toLowerCase().trim();
+    const result: typeof agentsByProjectKey = {};
+    for (const [projectKey, agents] of Object.entries(agentsByProjectKey)) {
+      if (!agents) continue;
+      const filtered = agents.filter(
+        (a) =>
+          (a.title && a.title.toLowerCase().includes(q)) || a.agentId.toLowerCase().includes(q),
+      );
+      if (filtered.length > 0) {
+        result[projectKey] = filtered;
+      }
+    }
+    return result;
+  }, [agentsByProjectKey, sessionSearchQuery]);
 
   const projectIconRequests = useMemo(() => {
     if (!serverId) {
@@ -2715,7 +2745,7 @@ export function SidebarWorkspaceList({
           dragHandleProps={dragHandleProps}
           useNestable={platformIsNative}
           creatingWorkspaceIds={creatingWorkspaceIds}
-          agentsForProject={agentsByProjectKey[item.projectKey] ?? EMPTY_SIDEBAR_AGENTS}
+          agentsForProject={filteredAgentsByProjectKey[item.projectKey] ?? EMPTY_SIDEBAR_AGENTS}
         />
       );
     },
@@ -2733,12 +2763,34 @@ export function SidebarWorkspaceList({
       shortcutIndexByWorkspaceKey,
       showShortcutBadges,
       creatingWorkspaceIds,
-      agentsByProjectKey,
+      filteredAgentsByProjectKey,
     ],
   );
 
+  const clearSessionSearch = useCallback(() => setSessionSearchQuery(""), []);
+
+  const sessionSearchBar = hasAnyAgents ? (
+    <View style={styles.searchBar} testID="session-search-bar">
+      <Search size={14} color="#9ca3af" />
+      <TextInput
+        style={styles.searchInput}
+        placeholder="Search sessions..."
+        placeholderTextColor={styles.placeholderColor.color}
+        value={sessionSearchQuery}
+        onChangeText={setSessionSearchQuery}
+        testID="session-search-input"
+      />
+      {sessionSearchQuery.length > 0 ? (
+        <Pressable onPress={clearSessionSearch} hitSlop={4} testID="session-search-clear">
+          <X size={14} color="#9ca3af" />
+        </Pressable>
+      ) : null}
+    </View>
+  ) : null;
+
   const content = (
     <>
+      {sessionSearchBar}
       {projects.length === 0 ? (
         <View style={styles.emptyContainer}>
           <Text style={styles.emptyTitle}>No projects yet</Text>
@@ -2801,6 +2853,29 @@ const styles = StyleSheet.create((theme) => ({
     paddingHorizontal: theme.spacing[2],
     paddingTop: theme.spacing[2],
     paddingBottom: theme.spacing[4],
+  },
+  searchBar: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginHorizontal: theme.spacing[2],
+    marginBottom: theme.spacing[2],
+    paddingHorizontal: theme.spacing[2],
+    height: 28,
+    borderRadius: theme.borderRadius.md,
+    backgroundColor: theme.colors.surface1,
+    gap: theme.spacing[2],
+  },
+  searchInput: {
+    flex: 1,
+    fontSize: theme.fontSize.xs,
+    color: theme.colors.foreground,
+    padding: 0,
+    borderWidth: 0,
+    backgroundColor: "transparent",
+    height: 28,
+  },
+  placeholderColor: {
+    color: theme.colors.foregroundMuted,
   },
   projectListContainer: {
     width: "100%",

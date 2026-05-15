@@ -110,6 +110,10 @@ import {
   resolveWorkspaceExecutionDirectory,
 } from "@/utils/workspace-execution";
 import { useSidebarAgents, type SidebarAgentEntry } from "@/hooks/use-sidebar-agents";
+import {
+  useDiscoverableSessionsQueries,
+  useWriteDiscoverableSessionsToStore,
+} from "@/hooks/use-discoverable-sessions-query";
 import { getProviderIcon } from "@/components/provider-icons";
 import { navigateToAgent } from "@/utils/navigate-to-agent";
 import {
@@ -1996,6 +2000,9 @@ function SidebarAgentRow({
         providerHandleId: agent.agentId,
       })
       .then((result) => {
+        useSessionStore
+          .getState()
+          .removeDiscoverableSession(serverId, agent.projectKey, agent.agentId);
         onWorkspacePress?.();
         navigateToAgent({ serverId, agentId: result.id, currentPathname });
         return result;
@@ -2393,17 +2400,7 @@ export function SidebarWorkspaceList({
   const selectionEnabled = isWorkspaceRoute;
 
   const projectKeys = useMemo(() => projects.map((p) => p.projectKey), [projects]);
-  const projectRootPaths = useMemo(() => {
-    const map = new Map<string, string>();
-    for (const project of projects) {
-      const rootPath = project.iconWorkingDir.trim();
-      if (rootPath) {
-        map.set(rootPath, project.projectKey);
-      }
-    }
-    return map;
-  }, [projects]);
-  const agentsByProjectKey = useSidebarAgents(serverId, projectKeys, projectRootPaths);
+  const agentsByProjectKey = useSidebarAgents(serverId, projectKeys);
 
   const projectIconRequests = useMemo(() => {
     if (!serverId) {
@@ -2470,6 +2467,20 @@ export function SidebarWorkspaceList({
 
     return byProject;
   }, [projectIconQueries, projectIconRequests, projects, serverId]);
+
+  const discoverableSessionRequests = useMemo(() => {
+    if (!serverId) return [];
+    return projects
+      .filter((p) => p.iconWorkingDir.trim())
+      .map((p) => ({
+        serverId,
+        projectKey: p.projectKey,
+        cwd: p.iconWorkingDir.trim(),
+      }));
+  }, [serverId, projects]);
+
+  const discoverableSessionQueries = useDiscoverableSessionsQueries(discoverableSessionRequests);
+  useWriteDiscoverableSessionsToStore(discoverableSessionRequests, discoverableSessionQueries);
 
   useEffect(() => {
     const timeouts = creatingWorkspaceTimeoutsRef.current;

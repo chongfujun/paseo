@@ -1,6 +1,7 @@
 import {
   View,
   Text,
+  TextInput,
   Pressable,
   Image,
   Platform,
@@ -1977,6 +1978,8 @@ function SidebarAgentRow({
   currentPathname: string | null;
 }) {
   const [importing, setImporting] = useState(false);
+  const [renaming, setRenaming] = useState(false);
+  const [renameValue, setRenameValue] = useState(agent.title ?? "");
 
   const handlePress = useCallback(() => {
     if (!serverId || importing) return;
@@ -1987,7 +1990,7 @@ function SidebarAgentRow({
       return;
     }
 
-    // Lazy import: auto-import unimported session on click
+    // Direct open: resume via native Claude Code session loading
     setImporting(true);
     const client = getHostRuntimeStore().getClient(serverId);
     if (!client) {
@@ -1995,10 +1998,16 @@ function SidebarAgentRow({
       return;
     }
     void client
-      .importAgent({
-        providerId: agent.provider,
-        providerHandleId: agent.agentId,
-      })
+      .resumeAgent(
+        {
+          provider: agent.provider,
+          sessionId: agent.agentId,
+          nativeHandle: agent.agentId,
+          metadata: { provider: agent.provider, cwd: agent.cwd },
+        },
+        undefined,
+        { skipTimelineHydration: true },
+      )
       .then((result) => {
         useSessionStore
           .getState()
@@ -2013,6 +2022,29 @@ function SidebarAgentRow({
       .finally(() => setImporting(false));
   }, [serverId, importing, agent, onWorkspacePress, currentPathname]);
 
+  const handleRename = useCallback(() => {
+    if (!serverId || !agent.imported) return;
+    const trimmed = renameValue.trim();
+    if (!trimmed || trimmed === agent.title) {
+      setRenaming(false);
+      return;
+    }
+    const client = getHostRuntimeStore().getClient(serverId);
+    if (!client) return;
+    void client
+      .updateAgent(agent.agentId, { name: trimmed })
+      .then(() => setRenaming(false))
+      .catch(() => {});
+  }, [serverId, agent, renameValue]);
+
+  const startRename = useCallback(() => {
+    if (!agent.imported) return;
+    setRenaming(true);
+    setRenameValue(agent.title ?? "");
+  }, [agent]);
+
+  const handleRenameBlur = useCallback(() => setRenaming(false), []);
+
   const rowStyle = useCallback(
     ({ pressed }: PressableStateCallbackType) => [
       sidebarAgentStyles.agentRow,
@@ -2024,7 +2056,14 @@ function SidebarAgentRow({
   const ProviderIcon = getProviderIcon(agent.provider);
 
   return (
-    <Pressable style={rowStyle} onPress={handlePress} disabled={importing}>
+    <Pressable
+      style={rowStyle}
+      onPress={handlePress}
+      onLongPress={startRename}
+      // @ts-ignore - onContextMenu is web-only and not in RN types.
+      onContextMenu={startRename}
+      disabled={importing}
+    >
       <View style={sidebarAgentStyles.agentIconWrap}>
         {importing ? (
           <ThemedActivityIndicator size={10} uniProps={foregroundMutedColorMapping} />
@@ -2032,9 +2071,22 @@ function SidebarAgentRow({
           <ProviderIcon size={12} color="#9ca3af" />
         )}
       </View>
-      <Text style={sidebarAgentStyles.agentTitle} numberOfLines={1}>
-        {agent.title ?? "Untitled session"}
-      </Text>
+      {renaming ? (
+        <TextInput
+          value={renameValue}
+          onChangeText={setRenameValue}
+          onSubmitEditing={handleRename}
+          onBlur={handleRenameBlur}
+          autoFocus
+          selectTextOnFocus
+          style={sidebarAgentStyles.renameInput}
+        />
+      ) : (
+        <Text style={sidebarAgentStyles.agentTitle} numberOfLines={1}>
+          {agent.title ?? "Untitled session"}
+        </Text>
+      )}
+      {!agent.imported && <Text style={sidebarAgentStyles.unimportedBadge}>未导入</Text>}
     </Pressable>
   );
 }
@@ -2094,6 +2146,26 @@ const sidebarAgentStyles = StyleSheet.create((theme) => ({
     fontWeight: "400",
     flex: 1,
     minWidth: 0,
+  },
+  unimportedBadge: {
+    fontSize: 9,
+    color: theme.colors.foregroundMuted,
+    backgroundColor: theme.colors.surface2,
+    paddingHorizontal: theme.spacing[1],
+    paddingVertical: 0,
+    borderRadius: theme.borderRadius.sm,
+    overflow: "hidden",
+    flexShrink: 0,
+  },
+  renameInput: {
+    color: theme.colors.foreground,
+    fontSize: theme.fontSize.xs,
+    fontWeight: "400",
+    flex: 1,
+    minWidth: 0,
+    padding: 0,
+    borderWidth: 0,
+    backgroundColor: "transparent",
   },
 }));
 

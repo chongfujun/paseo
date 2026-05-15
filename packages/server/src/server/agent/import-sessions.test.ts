@@ -169,6 +169,7 @@ test("listImportableProviderSessions filters, sorts, and projects importable ses
     listAgents: () =>
       [
         {
+          id: "00000000-0000-4000-8000-000000000632",
           provider: "codex",
           persistence: {
             provider: "codex",
@@ -182,6 +183,7 @@ test("listImportableProviderSessions filters, sorts, and projects importable ses
   const agentStorage = {
     list: async () => [
       {
+        id: "00000000-0000-4000-8000-000000000631",
         provider: "codex",
         persistence: {
           provider: "codex",
@@ -208,8 +210,19 @@ test("listImportableProviderSessions filters, sorts, and projects importable ses
     cwd,
   });
   expect(result).toEqual({
-    filteredAlreadyImportedCount: 2,
+    filteredAlreadyImportedCount: 0,
     entries: [
+      {
+        providerId: "codex",
+        providerLabel: "Codex",
+        providerHandleId: "stored-handle",
+        cwd,
+        title: "Already stored",
+        firstPromptPreview: null,
+        lastPromptPreview: null,
+        lastActivityAt: "2026-04-30T12:04:00.000Z",
+        importedAgentId: "00000000-0000-4000-8000-000000000631",
+      },
       {
         providerId: "codex",
         providerLabel: "Codex",
@@ -219,6 +232,17 @@ test("listImportableProviderSessions filters, sorts, and projects importable ses
         firstPromptPreview: "newer first prompt",
         lastPromptPreview: "newer last prompt",
         lastActivityAt: "2026-04-30T12:02:00.000Z",
+      },
+      {
+        providerId: "codex",
+        providerLabel: "Codex",
+        providerHandleId: "live-handle",
+        cwd,
+        title: "Already live",
+        firstPromptPreview: null,
+        lastPromptPreview: null,
+        lastActivityAt: "2026-04-30T12:01:00.000Z",
+        importedAgentId: "00000000-0000-4000-8000-000000000632",
       },
       {
         providerId: "codex",

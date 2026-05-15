@@ -16,6 +16,8 @@ extraResources:
     to: app-dist
   - from: ../../skills
     to: skills
+  - from: assets/icon.png
+    to: icon.png
 publish:
   provider: github
   owner: getpaseo
@@ -43,6 +45,8 @@ linux:
   extraResources:
     - from: bin/paseo
       to: bin/paseo
+    - from: assets/icon.png
+      to: icon.png
   target:
     - AppImage
     - deb
@@ -54,6 +58,8 @@ win:
   extraResources:
     - from: bin/paseo.cmd
       to: bin/paseo.cmd
+    - from: assets/icon.ico
+      to: icon.ico
   target:
     - target: nsis
       arch:

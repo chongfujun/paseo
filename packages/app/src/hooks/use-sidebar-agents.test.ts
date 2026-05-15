@@ -561,4 +561,91 @@ describe("deriveSidebarAgents", () => {
     });
     expect(result["/home/user/my-project"][0].cwd).toBe("/home/user/my-project");
   });
+
+  it("matches agent by cwd when projectPlacement.projectKey does not match sidebar", () => {
+    const agents = new Map([
+      [
+        "a1",
+        makeAgent({
+          id: "a1",
+          serverId: "s1",
+          cwd: "D:\\projects\\my-app",
+          title: "Session with mismatched projectKey",
+          projectPlacement: {
+            projectKey: "D:\\projects\\my-app",
+            projectName: "my-app",
+            checkout: {
+              cwd: "D:\\projects\\my-app",
+              isGit: false,
+              currentBranch: null,
+              remoteUrl: null,
+              worktreeRoot: null,
+              isPaseoOwnedWorktree: false,
+              mainRepoRoot: null,
+            },
+          },
+        }),
+      ],
+    ]);
+
+    const result = deriveSidebarAgents({
+      serverId: "s1",
+      projectKeys: ["workspace-proj-1"],
+      agents,
+      discoverableSessionsByProject: {},
+      projectWorkspaceDirs: new Map([["workspace-proj-1", "D:/projects/my-app"]]),
+    });
+
+    expect(result["workspace-proj-1"]).toHaveLength(1);
+    expect(result["workspace-proj-1"][0]).toEqual({
+      projectKey: "workspace-proj-1",
+      agentId: "a1",
+      title: "Session with mismatched projectKey",
+      provider: "claude",
+      status: "idle",
+      imported: true,
+      cwd: "D:\\projects\\my-app",
+    });
+  });
+
+  it("prefers direct projectKey match over cwd fallback", () => {
+    const agents = new Map([
+      [
+        "a1",
+        makeAgent({
+          id: "a1",
+          serverId: "s1",
+          cwd: "/projects/my-app",
+          title: "Direct match",
+          projectPlacement: {
+            projectKey: "proj-1",
+            projectName: "P1",
+            checkout: {
+              cwd: "/projects/my-app",
+              isGit: false,
+              currentBranch: null,
+              remoteUrl: null,
+              worktreeRoot: null,
+              isPaseoOwnedWorktree: false,
+              mainRepoRoot: null,
+            },
+          },
+        }),
+      ],
+    ]);
+
+    const result = deriveSidebarAgents({
+      serverId: "s1",
+      projectKeys: ["proj-1", "proj-2"],
+      agents,
+      discoverableSessionsByProject: {},
+      projectWorkspaceDirs: new Map([
+        ["proj-1", "/projects/my-app"],
+        ["proj-2", "/other/path"],
+      ]),
+    });
+
+    expect(result["proj-1"]).toHaveLength(1);
+    expect(result["proj-1"][0].projectKey).toBe("proj-1");
+  });
 });

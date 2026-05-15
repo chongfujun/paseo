@@ -262,6 +262,7 @@ export function toAgentListItemPayload(agent: AgentSnapshotPayload): AgentListIt
 export function toRecentProviderSessionDescriptorPayload(
   descriptor: PersistedAgentDescriptor,
   options: RecentProviderSessionProjectionOptions,
+  importedAgentId?: string,
 ): RecentProviderSessionDescriptorPayload {
   const promptPreviews = collectPromptPreviews(descriptor.timeline);
 
@@ -274,6 +275,7 @@ export function toRecentProviderSessionDescriptorPayload(
     firstPromptPreview: promptPreviews[0] ?? null,
     lastPromptPreview: promptPreviews.at(-1) ?? null,
     lastActivityAt: descriptor.lastActivityAt.toISOString(),
+    ...(importedAgentId ? { importedAgentId } : {}),
   };
 }
 

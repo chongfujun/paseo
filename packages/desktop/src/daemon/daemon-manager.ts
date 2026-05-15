@@ -532,10 +532,38 @@ export function createDaemonCommandHandlers(): Record<string, DesktopCommandHand
     get_local_daemon_version: () => getLocalDaemonVersion(),
     install_cli: () => installCli(),
     get_cli_install_status: () => getCliInstallStatus(),
-    get_skills_status: () => getSkillsStatus(),
-    install_skills: () => installSkills(),
-    update_skills: () => updateSkills(),
-    uninstall_skills: () => uninstallSkills(),
+    get_skills_status: async () => {
+      try {
+        return await getSkillsStatus();
+      } catch (error) {
+        log.error("[integrations] Failed to get skills status", error);
+        return { state: "not-installed", ops: [] };
+      }
+    },
+    install_skills: async () => {
+      try {
+        return await installSkills();
+      } catch (error) {
+        log.error("[integrations] Failed to install skills", error);
+        return { state: "not-installed", ops: [] };
+      }
+    },
+    update_skills: async () => {
+      try {
+        return await updateSkills();
+      } catch (error) {
+        log.error("[integrations] Failed to update skills", error);
+        return { state: "not-installed", ops: [] };
+      }
+    },
+    uninstall_skills: async () => {
+      try {
+        return await uninstallSkills();
+      } catch (error) {
+        log.error("[integrations] Failed to uninstall skills", error);
+        return { state: "not-installed", ops: [] };
+      }
+    },
   };
 }
 

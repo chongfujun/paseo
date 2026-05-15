@@ -20,5 +20,5 @@ export function normalizeWorkspacePath(value: string | null | undefined): string
     return withUnixSeparators;
   }
   const withoutTrailingSlash = withUnixSeparators.replace(/\/+$/, "");
-  return withoutTrailingSlash.length > 0 ? withoutTrailingSlash : "/";
+  return (withoutTrailingSlash.length > 0 ? withoutTrailingSlash : "/").toLowerCase();
 }

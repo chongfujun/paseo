@@ -1,4 +1,5 @@
 import type { AgentModelDefinition } from "../../agent-sdk-types.js";
+import { readClaudeSettingsModel } from "./claude-settings.js";
 
 const CLAUDE_THINKING_OPTIONS = [
   { id: "low", label: "Low" },
@@ -68,7 +69,27 @@ const CLAUDE_MODELS: AgentModelDefinition[] = [
 ];
 
 export function getClaudeModels(): AgentModelDefinition[] {
-  return CLAUDE_MODELS.map((model) => ({ ...model }));
+  const models = CLAUDE_MODELS.map((model) => ({ ...model }));
+  const settingsModel = readClaudeSettingsModel();
+  if (settingsModel) {
+    const alreadyListed = models.some(
+      (m) => m.id === settingsModel || m.id === `${settingsModel}[1m]`,
+    );
+    if (!alreadyListed) {
+      models.unshift({
+        provider: "claude",
+        id: settingsModel,
+        label: settingsModel,
+        description: `${settingsModel} · Configured in ~/.claude/settings.json`,
+      });
+    }
+    // When a custom model is configured, remove isDefault from all models
+    // so normalizeConfig won't override the SDK's own model resolution.
+    for (const m of models) {
+      delete m.isDefault;
+    }
+  }
+  return models;
 }
 
 /**

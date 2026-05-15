@@ -9,7 +9,7 @@ import type { AgentProvider, ProviderSnapshotEntry } from "./agent-sdk-types.js"
 import type { ProviderDefinition } from "./provider-registry.js";
 
 const DEFAULT_SNAPSHOT_TTL_MS = 300_000;
-const DEFAULT_REFRESH_TIMEOUT_MS = 30_000;
+const DEFAULT_REFRESH_TIMEOUT_MS = 5_000;
 
 type ProviderSnapshotChangeListener = (entries: ProviderSnapshotEntry[], cwd: string) => void;
 interface ProviderSnapshotManagerOptions {

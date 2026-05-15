@@ -9,14 +9,16 @@ interface NavigateToAgentInput {
   agentId: string;
   currentPathname?: string | null;
   pin?: boolean;
+  cwd?: string;
 }
 
 export function navigateToAgent(input: NavigateToAgentInput): string {
   const session = useSessionStore.getState().sessions[input.serverId];
   const agent = session?.agents.get(input.agentId) ?? session?.agentDetails.get(input.agentId);
+  const cwd = agent?.cwd ?? input.cwd;
   const workspaceId = resolveWorkspaceIdByExecutionDirectory({
     workspaces: session?.workspaces.values(),
-    workspaceDirectory: agent?.cwd,
+    workspaceDirectory: cwd,
   });
 
   if (!workspaceId) {

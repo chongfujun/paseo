@@ -19,19 +19,19 @@ After:
 ```
 
 - Remove the bulk `refreshDiscoverableSessions` from startup bootstrap
-- `useSidebarAgents` triggers per-project async loading when the sidebar renders each project
 - Each project loads independently; opening one session does not block loading others
 - Loading is transparent — data appears when ready, no loading spinners
+- `lightweight: true` means the server only reads the first few lines of each JSONL file (returns title + timestamp, skips full timeline parse)
 
 ### Store changes
 
-Replace the flat global array with per-project storage:
+Replace the flat global array with per-project storage inside the existing `SessionState` (keyed by `serverId`):
 
 ```typescript
-// Before
+// Before — inside state.sessions[serverId]
 discoverableSessions: FetchRecentProviderSessionEntry[]
 
-// After
+// After — inside state.sessions[serverId]
 discoverableSessionsByProject: {
   [projectKey: string]: {
     entries: FetchRecentProviderSessionEntry[],
@@ -40,12 +40,36 @@ discoverableSessionsByProject: {
 }
 ```
 
+- `useSidebarAgents` reads from `state.sessions[serverId]?.discoverableSessionsByProject[projectKey]`
 - Sidebar checks `fetched` before requesting; skips if already loaded
 - "Load more" appends to `entries` without replacing
+- Empty projects show nothing until data arrives; no placeholder rows
+
+### Fetch trigger mechanism
+
+The per-project fetch is triggered by a new `useDiscoverableSessions(serverId, projectKey, cwd)` hook. This hook uses Tanstack Query (already used in the app) to:
+
+1. On mount, check `fetched` flag in store
+2. If not fetched, call `client.fetchRecentProviderSessions({ cwd, lightweight: true, limit: 10 })`
+3. On success, write results to `discoverableSessionsByProject[projectKey]` and set `fetched = true`
+4. Return the entries for the caller to use
+
+The hook is called once per project row in the sidebar component. Tanstack Query handles deduplication and caching.
 
 ### Server-side
 
 No server changes needed. The existing `fetch_recent_provider_sessions_request` already supports `cwd`, and `collectRecentClaudeSessions` already filters by `cwd` (only scans the matching project directory). The fix is simply passing `cwd` from the client.
+
+### Pagination ("load more")
+
+The current RPC supports `limit` but has no offset/cursor. For "load more":
+
+- Client fetches initial batch with `limit: 10`
+- On "load more", client sends `since` parameter with the `lastActivityAt` of the last entry in the current list, plus `limit: 10`
+- Server already supports `since` filtering (filters by `descriptor.lastActivityAt < sinceTimestamp`)
+- Results are appended to the existing `entries` array in the store
+
+This avoids the need for a new server-side pagination mechanism.
 
 ### Sidebar display
 
@@ -53,16 +77,18 @@ No server changes needed. The existing `fetch_recent_provider_sessions_request` 
 - If more than 10 exist, show a "load more" button that fetches the next batch
 - Unimported sessions have a subtle visual distinction from imported agents (e.g., different icon)
 - Imported and unimported sessions are merged in the same list under each project
+- `deriveSidebarAgents` merges both lists, using `importedAgentId` field to skip entries that have already been imported (deduplication)
 
 ### Auto-import on click
 
 When the user clicks an unimported session:
 
 1. Call `importAgent` to import the session in the background
-2. On success, remove the entry from `discoverableSessionsByProject[projectKey].entries`
-3. The session automatically appears in the imported agent list (existing logic handles this)
-4. Navigate to the session
-5. User sees: click → brief loading → conversation opens
+2. On success, call a store action `removeDiscoverableSession(serverId, projectKey, providerHandleId)` to remove the entry
+3. The imported agent appears in the agent list via existing agent subscription
+4. `deriveSidebarAgents` uses `importedAgentId` to deduplicate — even if there's a brief overlap where both exist, it won't show duplicates
+5. Navigate to the session
+6. User sees: click → brief loading → conversation opens
 
 ### Files to change
 
@@ -70,8 +96,8 @@ When the user clicks an unimported session:
 | -------------------------------------------------------- | -------------------------------------------------------------------------------- |
 | `packages/app/src/runtime/host-runtime.ts`               | Remove `refreshDiscoverableSessions` from bootstrap                              |
 | `packages/app/src/stores/session-store.ts`               | Change `discoverableSessions` to per-project structure                           |
-| `packages/app/src/hooks/use-sidebar-agents.ts`           | Trigger per-project async fetch; merge imported + discovered                     |
-| `packages/app/src/components/sidebar-workspace-list.tsx` | Pass `cwd` per project; "load more" button                                       |
+| `packages/app/src/hooks/use-sidebar-agents.ts`           | Read from per-project store; add `useDiscoverableSessions` hook                  |
+| `packages/app/src/components/sidebar-workspace-list.tsx` | Call `useDiscoverableSessions` per project row; "load more" button               |
 | `packages/server/src/server/agent/import-sessions.ts`    | Remove the `effectiveLimit` safety net (no longer needed with per-project fetch) |
 
 ### Out of scope

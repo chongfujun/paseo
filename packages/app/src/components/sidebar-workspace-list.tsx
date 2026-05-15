@@ -2043,6 +2043,15 @@ function SidebarAgentRow({
     setRenameValue(agent.title ?? "");
   }, [agent]);
 
+  const handleContextMenu = useCallback(
+    (e: React.MouseEvent) => {
+      e.preventDefault();
+      e.stopPropagation();
+      startRename();
+    },
+    [startRename],
+  );
+
   const handleRenameBlur = useCallback(() => setRenaming(false), []);
 
   const rowStyle = useCallback(
@@ -2061,7 +2070,7 @@ function SidebarAgentRow({
       onPress={handlePress}
       onLongPress={startRename}
       // @ts-ignore - onContextMenu is web-only and not in RN types.
-      onContextMenu={startRename}
+      onContextMenu={handleContextMenu}
       disabled={importing}
     >
       <View style={sidebarAgentStyles.agentIconWrap}>

@@ -9,6 +9,7 @@ export interface SidebarAgentEntry {
   provider: string;
   status: string;
   imported: boolean;
+  cwd: string;
 }
 
 export interface SidebarAgentsByProjectKey {
@@ -47,6 +48,7 @@ export function deriveSidebarAgents(input: {
         provider: agent.provider,
         status: agent.status,
         imported: true,
+        cwd: agent.cwd,
       });
     }
   }
@@ -65,6 +67,7 @@ export function deriveSidebarAgents(input: {
         provider: session.providerId,
         status: "idle",
         imported: false,
+        cwd: session.cwd,
       });
     }
   }

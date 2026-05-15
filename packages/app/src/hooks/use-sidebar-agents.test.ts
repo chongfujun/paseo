@@ -146,6 +146,7 @@ describe("deriveSidebarAgents", () => {
           provider: "claude",
           status: "idle",
           imported: true,
+          cwd: "/project",
         },
       ],
     });
@@ -433,6 +434,7 @@ describe("deriveSidebarAgents", () => {
       provider: "claude",
       status: "idle",
       imported: false,
+      cwd: "/home/user/my-project",
     });
   });
 
@@ -505,5 +507,58 @@ describe("deriveSidebarAgents", () => {
     const discoverable = result["/project"].find((a) => !a.imported);
     expect(imported!.agentId).toBe("a1");
     expect(discoverable!.agentId).toBe("handle-y");
+  });
+
+  it("includes cwd from imported agent", () => {
+    const agents = new Map([
+      [
+        "a1",
+        makeAgent({
+          id: "a1",
+          serverId: "s1",
+          cwd: "/home/user/project-x",
+          projectPlacement: {
+            projectKey: "/home/user/project-x",
+            projectName: "project-x",
+            checkout: {
+              cwd: "/home/user/project-x",
+              isGit: false,
+              currentBranch: null,
+              remoteUrl: null,
+              worktreeRoot: null,
+              isPaseoOwnedWorktree: false,
+              mainRepoRoot: null,
+            },
+          },
+        }),
+      ],
+    ]);
+    const result = deriveSidebarAgents({
+      serverId: "s1",
+      projectKeys: ["/home/user/project-x"],
+      agents,
+      discoverableSessionsByProject: {},
+    });
+    expect(result["/home/user/project-x"][0].cwd).toBe("/home/user/project-x");
+  });
+
+  it("includes cwd from unimported session", () => {
+    const result = deriveSidebarAgents({
+      serverId: "s1",
+      projectKeys: ["/home/user/my-project"],
+      agents: new Map(),
+      discoverableSessionsByProject: {
+        "/home/user/my-project": {
+          entries: [
+            makeDiscoverable({
+              providerHandleId: "handle-x",
+              cwd: "/home/user/my-project",
+            }),
+          ],
+          fetched: true,
+        },
+      },
+    });
+    expect(result["/home/user/my-project"][0].cwd).toBe("/home/user/my-project");
   });
 });

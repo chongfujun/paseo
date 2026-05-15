@@ -5653,7 +5653,8 @@ export class Session {
       ),
     );
     for (let i = 0; i < pairs.length; i += 1) {
-      placementsByCwd.set(normalizePersistedWorkspaceId(pairs[i].workspace.cwd), placements[i]);
+      const key = normalizePersistedWorkspaceId(pairs[i].workspace.cwd).toLowerCase();
+      placementsByCwd.set(key, placements[i]);
     }
 
     return placementsByCwd;
@@ -5723,7 +5724,8 @@ export class Session {
     if (activePlacementsByCwd) {
       agents = agents.filter(
         (agent) =>
-          !agent.archivedAt && activePlacementsByCwd.has(normalizePersistedWorkspaceId(agent.cwd)),
+          !agent.archivedAt &&
+          activePlacementsByCwd.has(normalizePersistedWorkspaceId(agent.cwd).toLowerCase()),
       );
     }
 
@@ -5731,7 +5733,7 @@ export class Session {
     const getPlacement = (cwd: string): Promise<ProjectPlacementPayload | null> => {
       if (activePlacementsByCwd) {
         return Promise.resolve(
-          activePlacementsByCwd.get(normalizePersistedWorkspaceId(cwd)) ?? null,
+          activePlacementsByCwd.get(normalizePersistedWorkspaceId(cwd).toLowerCase()) ?? null,
         );
       }
       const existing = placementByCwd.get(cwd);

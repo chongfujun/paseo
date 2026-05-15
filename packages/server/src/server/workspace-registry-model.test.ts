@@ -8,6 +8,7 @@ import {
   deriveWorkspaceId,
   detectStaleWorkspaces,
   normalizeWorkspaceId,
+  workspaceIdEquals,
 } from "./workspace-registry-model.js";
 import { createPersistedWorkspaceRecord } from "./workspace-registry.js";
 
@@ -92,10 +93,10 @@ describe("detectStaleWorkspaces", () => {
 });
 
 describe("normalizeWorkspaceId", () => {
-  test("normalizes Windows drive letter to lowercase", () => {
-    expect(normalizeWorkspaceId("D:\\cvedetails\\google-osv-api")).toBe(
-      normalizeWorkspaceId("d:\\cvedetails\\google-osv-api"),
-    );
+  test("workspaceIdEquals considers Windows drive letter case-insensitively", () => {
+    expect(
+      workspaceIdEquals("D:\\cvedetails\\google-osv-api", "d:\\cvedetails\\google-osv-api"),
+    ).toBe(true);
   });
 });
 

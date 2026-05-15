@@ -29,7 +29,11 @@ export function normalizeWorkspaceId(cwd: string): string {
   if (!trimmed) {
     return cwd;
   }
-  return resolve(trimmed).toLowerCase();
+  return resolve(trimmed);
+}
+
+export function workspaceIdEquals(a: string, b: string): boolean {
+  return normalizeWorkspaceId(a).toLowerCase() === normalizeWorkspaceId(b).toLowerCase();
 }
 
 export function deriveWorkspaceId(cwd: string, checkout: ProjectCheckoutLitePayload): string {

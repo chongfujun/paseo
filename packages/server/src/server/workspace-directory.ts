@@ -13,7 +13,7 @@ import {
 } from "../shared/agent-state-bucket.js";
 import { SortablePager } from "./pagination/sortable-pager.js";
 import type { PersistedProjectRecord, PersistedWorkspaceRecord } from "./workspace-registry.js";
-import { normalizeWorkspaceId } from "./workspace-registry-model.js";
+import { normalizeWorkspaceId, workspaceIdEquals } from "./workspace-registry-model.js";
 
 const FETCH_WORKSPACES_SORT_KEYS = [
   "status_priority",
@@ -215,7 +215,7 @@ export class WorkspaceDirectory {
 
   resolveRegisteredWorkspaceIdForCwd(cwd: string, workspaces: PersistedWorkspaceRecord[]): string {
     const normalizedCwd = normalizeWorkspaceId(cwd);
-    const exact = workspaces.find((workspace) => workspace.cwd === normalizedCwd);
+    const exact = workspaces.find((workspace) => workspaceIdEquals(workspace.cwd, cwd));
     if (exact) {
       return exact.workspaceId;
     }
@@ -223,13 +223,19 @@ export class WorkspaceDirectory {
     const userHome = homedir();
     let bestMatch: PersistedWorkspaceRecord | null = null;
     for (const workspace of workspaces) {
-      if (workspace.cwd === userHome) continue;
+      if (workspaceIdEquals(workspace.cwd, userHome)) continue;
       if (workspace.archivedAt) continue;
-      const prefix = workspace.cwd.endsWith(sep) ? workspace.cwd : `${workspace.cwd}${sep}`;
+      const normalizedWorkspaceCwd = normalizeWorkspaceId(workspace.cwd);
+      const prefix = normalizedWorkspaceCwd.endsWith(sep)
+        ? normalizedWorkspaceCwd
+        : `${normalizedWorkspaceCwd}${sep}`;
       if (!normalizedCwd.startsWith(prefix)) {
         continue;
       }
-      if (!bestMatch || workspace.cwd.length > bestMatch.cwd.length) {
+      if (
+        !bestMatch ||
+        normalizedWorkspaceCwd.length > normalizeWorkspaceId(bestMatch.cwd).length
+      ) {
         bestMatch = workspace;
       }
     }

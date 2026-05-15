@@ -91,6 +91,14 @@ describe("detectStaleWorkspaces", () => {
   });
 });
 
+describe("normalizeWorkspaceId", () => {
+  test("normalizes Windows drive letter to lowercase", () => {
+    expect(normalizeWorkspaceId("D:\\cvedetails\\google-osv-api")).toBe(
+      normalizeWorkspaceId("d:\\cvedetails\\google-osv-api"),
+    );
+  });
+});
+
 describe("deriveWorkspaceId", () => {
   test("uses git worktree root when available", () => {
     expect(

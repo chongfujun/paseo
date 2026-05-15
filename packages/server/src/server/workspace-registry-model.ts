@@ -29,7 +29,7 @@ export function normalizeWorkspaceId(cwd: string): string {
   if (!trimmed) {
     return cwd;
   }
-  return resolve(trimmed);
+  return resolve(trimmed).toLowerCase();
 }
 
 export function deriveWorkspaceId(cwd: string, checkout: ProjectCheckoutLitePayload): string {

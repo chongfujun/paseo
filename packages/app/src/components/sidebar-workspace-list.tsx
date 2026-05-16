@@ -1979,6 +1979,10 @@ function SidebarAgentRow({
   onWorkspacePress?: () => void;
   currentPathname: string | null;
 }) {
+  const focusedAgentId = useSessionStore((state) =>
+    serverId ? (state.sessions[serverId]?.focusedAgentId ?? null) : null,
+  );
+  const isSelected = focusedAgentId === agent.agentId;
   const [importing, setImporting] = useState(false);
   const [renaming, setRenaming] = useState(false);
   const [renameValue, setRenameValue] = useState(agent.title ?? "");
@@ -2063,8 +2067,9 @@ function SidebarAgentRow({
     ({ pressed }: PressableStateCallbackType) => [
       sidebarAgentStyles.agentRow,
       pressed && sidebarAgentStyles.agentRowPressed,
+      isSelected && styles.sidebarRowSelected,
     ],
-    [],
+    [isSelected],
   );
 
   const ProviderIcon = getProviderIcon(agent.provider);

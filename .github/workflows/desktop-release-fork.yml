@@ -57,8 +57,8 @@ jobs:
           CSC_IDENTITY_AUTO_DISCOVERY: "false"
         run: |
           set -euo pipefail
-          npx expo export --platform web --output-dir packages/app/dist
-          npm run build:desktop -- --publish never --mac --${{ matrix.electron_arch }} -c.mac.notarize=false
+          cd packages/app && npx expo export --platform web
+          cd ../.. && npm run build:desktop -- --publish never --mac --${{ matrix.electron_arch }} -c.mac.notarize=false
 
       - name: Upload artifacts to release
         env:
@@ -108,8 +108,8 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -euo pipefail
-          npx expo export --platform web --output-dir packages/app/dist
-          npm run build:desktop -- --publish never --win --x64 --arm64
+          cd packages/app && npx expo export --platform web
+          cd ../.. && npm run build:desktop -- --publish never --win --x64 --arm64
 
       - name: Upload artifacts to release
         env:
@@ -159,8 +159,8 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -euo pipefail
-          npx expo export --platform web --output-dir packages/app/dist
-          npm run build:desktop -- --publish never --linux --x64
+          cd packages/app && npx expo export --platform web
+          cd ../.. && npm run build:desktop -- --publish never --linux --x64
 
       - name: Upload artifacts to release
         env:

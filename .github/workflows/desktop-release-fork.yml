@@ -50,14 +50,11 @@ jobs:
       - name: Install JS dependencies
         run: npm ci
 
+      - name: Increase swap for tsc
+        run: echo "NODE_OPTIONS=--max-old-space-size=6144" >> $GITHUB_ENV
+
       - name: Build workspace packages
-        run: |
-          npm run build --workspace=@getpaseo/highlight
-          npm run build --workspace=@getpaseo/expo-two-way-audio
-          npm run build --workspace=@getpaseo/relay
-          cd packages/server && npx tsgo -p tsconfig.server.json --outDir ./dist/server && npx tsgo -p tsconfig.scripts.json --outDir ./dist/scripts && node -e "const fs=require('node:fs'); fs.mkdirSync('dist/server/server/speech/providers/local/sherpa/assets',{recursive:true}); fs.copyFileSync('src/server/speech/providers/local/sherpa/assets/silero_vad.onnx','dist/server/server/speech/providers/local/sherpa/assets/silero_vad.onnx'); fs.cpSync('src/terminal/shell-integration','dist/server/terminal/shell-integration',{recursive:true}); fs.cpSync('src/terminal/shell-integration','dist/src/terminal/shell-integration',{recursive:true}); fs.copyFileSync('src/terminal/terminal-ts-loader.mjs','dist/server/terminal/terminal-ts-loader.mjs'); fs.copyFileSync('scripts/mcp-stdio-socket-bridge-cli.mjs','dist/scripts/mcp-stdio-socket-bridge-cli.mjs');"
-          cd ../..
-          npm run build --workspace=@getpaseo/cli
+        run: npm run build:daemon
 
       - name: Export web app
         run: cd packages/app && npx expo export --platform web
@@ -126,7 +123,8 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -euo pipefail
-          cd packages/desktop && npx electron-builder --config electron-builder.yml --publish never --win --x64 --arm64
+          npx electron-builder --config electron-builder.yml --publish never --win --x64 --arm64
+        working-directory: packages/desktop
 
       - name: Upload artifacts to release
         env:
@@ -182,7 +180,8 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -euo pipefail
-          cd packages/desktop && npx electron-builder --config electron-builder.yml --publish never --linux --x64
+          npx electron-builder --config electron-builder.yml --publish never --linux --x64
+        working-directory: packages/desktop
 
       - name: Upload artifacts to release
         env:

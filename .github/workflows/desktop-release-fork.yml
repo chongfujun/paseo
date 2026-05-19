@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
     inputs:
       tag:
-        description: "Tag to attach release artifacts (e.g. v0.1.75-kaifeng)"
+        description: "Tag to attach release artifacts (e.g. v0.1.75-chongfujun)"
         required: true
         type: string
       platform:
@@ -50,16 +50,27 @@ jobs:
       - name: Install JS dependencies
         run: npm ci
 
+      - name: Build workspace packages
+        run: |
+          npm run build --workspace=@getpaseo/highlight
+          npm run build --workspace=@getpaseo/expo-two-way-audio
+          npm run build --workspace=@getpaseo/relay
+          cd packages/server && npx tsgo -p tsconfig.server.json --outDir ./dist/server && npx tsgo -p tsconfig.scripts.json --outDir ./dist/scripts && node -e "const fs=require('node:fs'); fs.mkdirSync('dist/server/server/speech/providers/local/sherpa/assets',{recursive:true}); fs.copyFileSync('src/server/speech/providers/local/sherpa/assets/silero_vad.onnx','dist/server/server/speech/providers/local/sherpa/assets/silero_vad.onnx'); fs.cpSync('src/terminal/shell-integration','dist/server/terminal/shell-integration',{recursive:true}); fs.cpSync('src/terminal/shell-integration','dist/src/terminal/shell-integration',{recursive:true}); fs.copyFileSync('src/terminal/terminal-ts-loader.mjs','dist/server/terminal/terminal-ts-loader.mjs'); fs.copyFileSync('scripts/mcp-stdio-socket-bridge-cli.mjs','dist/scripts/mcp-stdio-socket-bridge-cli.mjs');"
+          cd ../..
+          npm run build --workspace=@getpaseo/cli
+
+      - name: Export web app
+        run: cd packages/app && npx expo export --platform web
+
       - name: Build desktop (unsigned, no notarize)
         shell: bash
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           CSC_IDENTITY_AUTO_DISCOVERY: "false"
-          NODE_OPTIONS: "--max-old-space-size=4096"
         run: |
           set -euo pipefail
-          cd packages/app && npx expo export --platform web
-          cd ../.. && npm run build:desktop -- --publish never --mac --${{ matrix.electron_arch }} -c.mac.notarize=false
+          cd packages/desktop && npx tsgo --noEmit -p tsconfig.json
+          npx electron-builder --config electron-builder.yml --publish never --mac --${{ matrix.electron_arch }} -c.mac.notarize=false
 
       - name: Upload artifacts to release
         env:
@@ -103,15 +114,19 @@ jobs:
       - name: Install JS dependencies
         run: npm ci
 
+      - name: Build workspace packages
+        run: npm run build:daemon
+
+      - name: Export web app
+        run: cd packages/app && npx expo export --platform web
+
       - name: Build desktop
         shell: bash
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          NODE_OPTIONS: "--max-old-space-size=4096"
         run: |
           set -euo pipefail
-          cd packages/app && npx expo export --platform web
-          cd ../.. && npm run build:desktop -- --publish never --win --x64 --arm64
+          cd packages/desktop && npx electron-builder --config electron-builder.yml --publish never --win --x64 --arm64
 
       - name: Upload artifacts to release
         env:
@@ -155,15 +170,19 @@ jobs:
       - name: Install Linux display dependencies
         run: sudo apt-get update && sudo apt-get install -y xvfb
 
+      - name: Build workspace packages
+        run: npm run build:daemon
+
+      - name: Export web app
+        run: cd packages/app && npx expo export --platform web
+
       - name: Build desktop
         shell: bash
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          NODE_OPTIONS: "--max-old-space-size=4096"
         run: |
           set -euo pipefail
-          cd packages/app && npx expo export --platform web
-          cd ../.. && npm run build:desktop -- --publish never --linux --x64
+          cd packages/desktop && npx electron-builder --config electron-builder.yml --publish never --linux --x64
 
       - name: Upload artifacts to release
         env:

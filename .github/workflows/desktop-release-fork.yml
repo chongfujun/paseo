@@ -23,12 +23,6 @@ env:
 jobs:
   build-macos:
     if: github.event.inputs.platform == 'macos'
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - electron_arch: arm64
-          - electron_arch: x64
     permissions:
       contents: write
     runs-on: ubuntu-22.04
@@ -51,7 +45,7 @@ jobs:
       - name: Build highlight + relay
         run: npm run build --workspace=@getpaseo/highlight && npm run build --workspace=@getpaseo/relay
 
-      - name: Build server (tsgo to avoid OOM)
+      - name: Build server (tsgo to avoid tsc OOM)
         run: |
           cd packages/server
           node -e "require('node:fs').rmSync('dist',{ recursive: true, force: true })"
@@ -66,14 +60,24 @@ jobs:
       - name: Export web app
         run: cd packages/app && npx expo export --platform web
 
-      - name: Build macOS desktop (cross-compiled, unsigned)
+      - name: Build macOS desktop arm64 (cross-compiled, unsigned)
         shell: bash
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           CSC_IDENTITY_AUTO_DISCOVERY: "false"
         run: |
           set -euo pipefail
-          npx electron-builder --config electron-builder.yml --publish never --mac --${{ matrix.electron_arch }} -c.mac.notarize=false
+          npx electron-builder --config electron-builder.yml --publish never --mac --arm64 -c.mac.notarize=false
+        working-directory: packages/desktop
+
+      - name: Build macOS desktop x64 (cross-compiled, unsigned)
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          CSC_IDENTITY_AUTO_DISCOVERY: "false"
+        run: |
+          set -euo pipefail
+          npx electron-builder --config electron-builder.yml --publish never --mac --x64 -c.mac.notarize=false
         working-directory: packages/desktop
 
       - name: Upload artifacts to release

@@ -69,8 +69,8 @@ jobs:
           CSC_IDENTITY_AUTO_DISCOVERY: "false"
         run: |
           set -euo pipefail
-          cd packages/desktop && npx tsgo --noEmit -p tsconfig.json
           npx electron-builder --config electron-builder.yml --publish never --mac --${{ matrix.electron_arch }} -c.mac.notarize=false
+        working-directory: packages/desktop
 
       - name: Upload artifacts to release
         env:

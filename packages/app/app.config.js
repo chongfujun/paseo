@@ -148,9 +148,8 @@ export default {
     extra: {
       router: {},
       eas: {
-        projectId: "0e7f65ce-0367-46c8-a238-2b65963d235a",
+        projectId: "ba06107d-b469-46f3-b363-6d28c876871d",
       },
     },
-    owner: "getpaseo",
   },
 };

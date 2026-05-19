@@ -1,0 +1,18 @@
+# Desktop release builds (3.2+ GB) — only these need to be excluded
+packages/desktop/release/
+packages/desktop/release2/
+packages/desktop/release4/
+packages/desktop/release5/
+
+# Desktop build output/cache
+packages/desktop/.cache/
+
+# Playwright and debug artifacts
+.playwright-mcp/
+.debug/
+.debug.conversations/
+claude-code-rev/
+
+# OS
+.DS_Store
+bash.exe.stackdump

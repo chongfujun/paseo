@@ -27,13 +27,11 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - runner: macos-14
-            electron_arch: arm64
-          - runner: macos-15-intel
-            electron_arch: x64
+          - electron_arch: arm64
+          - electron_arch: x64
     permissions:
       contents: write
-    runs-on: ${{ matrix.runner }}
+    runs-on: ubuntu-22.04
 
     steps:
       - uses: actions/checkout@v4
@@ -50,16 +48,13 @@ jobs:
       - name: Install JS dependencies
         run: npm ci
 
-      - name: Increase swap for tsc
-        run: echo "NODE_OPTIONS=--max-old-space-size=6144" >> $GITHUB_ENV
-
       - name: Build workspace packages
         run: npm run build:daemon
 
       - name: Export web app
         run: cd packages/app && npx expo export --platform web
 
-      - name: Build desktop (unsigned, no notarize)
+      - name: Build macOS desktop (cross-compiled, unsigned)
         shell: bash
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}

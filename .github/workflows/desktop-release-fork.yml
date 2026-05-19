@@ -50,14 +50,12 @@ jobs:
       - name: Install JS dependencies
         run: npm ci
 
-      - name: Build workspace packages
-        run: npm run build:daemon
-
       - name: Build desktop (unsigned, no notarize)
         shell: bash
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           CSC_IDENTITY_AUTO_DISCOVERY: "false"
+          NODE_OPTIONS: "--max-old-space-size=4096"
         run: |
           set -euo pipefail
           cd packages/app && npx expo export --platform web
@@ -105,13 +103,11 @@ jobs:
       - name: Install JS dependencies
         run: npm ci
 
-      - name: Build workspace packages
-        run: npm run build:daemon
-
       - name: Build desktop
         shell: bash
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          NODE_OPTIONS: "--max-old-space-size=4096"
         run: |
           set -euo pipefail
           cd packages/app && npx expo export --platform web
@@ -159,13 +155,11 @@ jobs:
       - name: Install Linux display dependencies
         run: sudo apt-get update && sudo apt-get install -y xvfb
 
-      - name: Build workspace packages
-        run: npm run build:daemon
-
       - name: Build desktop
         shell: bash
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          NODE_OPTIONS: "--max-old-space-size=4096"
         run: |
           set -euo pipefail
           cd packages/app && npx expo export --platform web

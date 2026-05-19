@@ -25,7 +25,7 @@ jobs:
     if: github.event.inputs.platform == 'macos'
     permissions:
       contents: write
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-22.04-4core
 
     steps:
       - uses: actions/checkout@v4
@@ -42,17 +42,9 @@ jobs:
       - name: Install JS dependencies
         run: npm ci
 
-      - name: Add swap space for tsc
-        run: |
-          sudo fallocate -l 8G /mnt/swapfile
-          sudo chmod 600 /mnt/swapfile
-          sudo mkswap /mnt/swapfile
-          sudo swapon /mnt/swapfile
-          echo "Swap added: $(free -h | grep Swap)"
-
       - name: Build workspace packages
         env:
-          NODE_OPTIONS: "--max-old-space-size=16384"
+          NODE_OPTIONS: "--max-old-space-size=7168"
         run: npm run build:daemon
 
       - name: Export web app

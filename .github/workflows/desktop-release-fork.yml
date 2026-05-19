@@ -52,7 +52,7 @@ jobs:
 
       - name: Build workspace packages
         env:
-          NODE_OPTIONS: "--max-old-space-size=8192"
+          NODE_OPTIONS: "--max-old-space-size=16384"
         run: npm run build:daemon
 
       - name: Export web app
@@ -122,7 +122,7 @@ jobs:
 
       - name: Build workspace packages
         env:
-          NODE_OPTIONS: "--max-old-space-size=8192"
+          NODE_OPTIONS: "--max-old-space-size=16384"
         run: npm run build:daemon
 
       - name: Export web app
@@ -181,7 +181,7 @@ jobs:
 
       - name: Build workspace packages
         env:
-          NODE_OPTIONS: "--max-old-space-size=8192"
+          NODE_OPTIONS: "--max-old-space-size=16384"
         run: npm run build:daemon
 
       - name: Export web app

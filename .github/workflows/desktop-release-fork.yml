@@ -49,6 +49,8 @@ jobs:
         run: npm ci
 
       - name: Build workspace packages
+        env:
+          NODE_OPTIONS: "--max-old-space-size=6144"
         run: npm run build:daemon
 
       - name: Export web app
@@ -107,6 +109,8 @@ jobs:
         run: npm ci
 
       - name: Build workspace packages
+        env:
+          NODE_OPTIONS: "--max-old-space-size=6144"
         run: npm run build:daemon
 
       - name: Export web app
@@ -164,6 +168,8 @@ jobs:
         run: sudo apt-get update && sudo apt-get install -y xvfb
 
       - name: Build workspace packages
+        env:
+          NODE_OPTIONS: "--max-old-space-size=6144"
         run: npm run build:daemon
 
       - name: Export web app

@@ -48,10 +48,20 @@ jobs:
       - name: Install JS dependencies
         run: npm ci
 
-      - name: Build workspace packages
-        env:
-          NODE_OPTIONS: "--max-old-space-size=6144"
-        run: npm run build:daemon
+      - name: Build highlight + relay
+        run: npm run build --workspace=@getpaseo/highlight && npm run build --workspace=@getpaseo/relay
+
+      - name: Build server (tsgo to avoid OOM)
+        run: |
+          cd packages/server
+          node -e "require('node:fs').rmSync('dist',{ recursive: true, force: true })"
+          npx tsgo -p tsconfig.server.json --noEmit false
+          node -e "const fs=require('node:fs'); fs.mkdirSync('dist/server/server/speech/providers/local/sherpa/assets',{recursive:true}); fs.copyFileSync('src/server/speech/providers/local/sherpa/assets/silero_vad.onnx','dist/server/server/speech/providers/local/sherpa/assets/silero_vad.onnx'); fs.cpSync('src/terminal/shell-integration','dist/server/terminal/shell-integration',{recursive:true}); fs.cpSync('src/terminal/shell-integration','dist/src/terminal/shell-integration',{recursive:true}); fs.copyFileSync('src/terminal/terminal-ts-loader.mjs','dist/server/terminal/terminal-ts-loader.mjs');"
+          npx tsgo -p tsconfig.scripts.json --noEmit false
+          node -e "const fs=require('node:fs'); fs.mkdirSync('dist/scripts',{recursive:true}); fs.copyFileSync('scripts/mcp-stdio-socket-bridge-cli.mjs','dist/scripts/mcp-stdio-socket-bridge-cli.mjs');"
+
+      - name: Build CLI
+        run: npm run build --workspace=@getpaseo/cli
 
       - name: Export web app
         run: cd packages/app && npx expo export --platform web
